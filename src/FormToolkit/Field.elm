@@ -79,6 +79,7 @@ import Internal.View
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Extra
+import Regex
 import RoseTree.Path as Path
 import RoseTree.Tree as Tree
 import String.Extra
@@ -288,7 +289,9 @@ email =
     init Email
 
 
-{-| Builds a URL input field.
+{-| Builds a URL input field, validation will fail if input is a valid url.
+This check is more lenient than `Parse.url` since protocols other than http and
+https are accepted.
 
     urlField : Field id
     urlField =
@@ -1408,7 +1411,7 @@ checkEmail node =
                     setError ParseError node
 
         Url ->
-            case Internal.Value.toString attrs.value |> Maybe.andThen Url.fromString of
+            case Internal.Value.toString attrs.value |> Maybe.andThen validateUrl of
                 Just _ ->
                     node
 
@@ -1417,6 +1420,14 @@ checkEmail node =
 
         _ ->
             node
+
+
+validateUrl : String -> Maybe Url.Url
+validateUrl urlString =
+    Regex.fromString "^(\\w+)://"
+        |> Maybe.withDefault Regex.never
+        |> (\regex -> Regex.replace regex (\_ -> "http://") urlString)
+        |> Url.fromString
 
 
 checkPattern : Node id -> Node id

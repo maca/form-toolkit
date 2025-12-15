@@ -383,6 +383,9 @@ suite =
                         , \_ -> testUrl "http://example.com" True
                         , \_ -> testUrl "https://example.com/path" True
                         , \_ -> testUrl "https://example.com/path?query=value" True
+                        , \_ -> testUrl "ftp://example.com" True
+                        , \_ -> testUrl "ssh://example.com" True
+                        , \_ -> testUrl "custom://example.com" True
                         , \_ -> testUrl "not-a-url" False
                         , \_ -> testUrl "example.com" False
                         , \_ -> testUrl "//example.com" False
