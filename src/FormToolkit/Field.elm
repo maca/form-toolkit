@@ -1045,6 +1045,38 @@ updateValuesFromJson jsonValue (Field field) =
         |> Result.map (validateTree >> Field)
 
 
+updateValuesFromJsonWithFallback : Encode.Value -> Field id -> Result (Error id) (Field id)
+updateValuesFromJsonWithFallback jsonValue (Field field) =
+    let
+        namePaths =
+            namesToPaths (Field field)
+    in
+    valueToPathLists jsonValue
+        |> Result.andThen
+            (List.foldl
+                (\( key, val ) ->
+                    Result.andThen
+                        (\node ->
+                            case Dict.get key namePaths of
+                                Just path ->
+                                    Ok
+                                        (Tree.updateAt path
+                                            (updateValueWithString val)
+                                            node
+                                        )
+
+                                Nothing ->
+                                    Err
+                                        (CustomError Nothing
+                                            ("No name path: " ++ key ++ " was found")
+                                        )
+                        )
+                )
+                (Ok field)
+            )
+        |> Result.map (validateTree >> Field)
+
+
 valueToPathLists : Encode.Value -> Result (Error id) (List ( String, String ))
 valueToPathLists jsonValue =
     Decode.decodeValue recursiveStringListDecoder jsonValue

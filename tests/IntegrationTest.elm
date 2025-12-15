@@ -6,7 +6,6 @@ import FormToolkit.Field as Field
 import FormToolkit.Parse as Parse
 import FormToolkit.Value as Value
 import Html.Attributes as Attrs exposing (for, name, required)
-import Json.Decode
 import Json.Encode
 import Support.ExampleInputs exposing (..)
 import Support.Interaction as Interaction exposing (..)

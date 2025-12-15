@@ -131,8 +131,8 @@ updateValuesFromJsonTests =
                                     >> Query.has [ attribute (Attrs.value "03100") ]
                                 ]
 
-                    Err _ ->
-                        Expect.fail "updateValuesFromJson should succeed"
+                    Err err ->
+                        Expect.fail (Error.toEnglish err)
         , test "sets values from JSON for form with repeatable hobby fields" <|
             \_ ->
                 case Field.updateValuesFromJson hobbiesFormValues hobbiesForm of
@@ -154,8 +154,18 @@ updateValuesFromJsonTests =
                                     >> Query.has [ attribute (Attrs.value "cooking") ]
                                 ]
 
-                    Err _ ->
-                        Expect.fail "updateValuesFromJson should succeed for repeatable fields"
+                    Err err ->
+                        Expect.fail (Error.toEnglish err)
+        , test "fails when path does not exist" <|
+            \_ ->
+                Field.group []
+                    [ Field.text
+                        [ Field.name "name"
+                        , Field.identifier "UserName"
+                        ]
+                    ]
+                    |> Field.updateValuesFromJson hobbiesFormValues
+                    |> Expect.equal (Err (Error.CustomError Nothing "No name path: hobbies.0.hobby was found"))
         , test "handles null values gracefully by updating only non-null fields" <|
             \_ ->
                 let
