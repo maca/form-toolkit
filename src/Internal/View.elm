@@ -184,6 +184,9 @@ toHtml view =
         ( False, Email ) ->
             fieldView_ (inputToHtml view "email" [])
 
+        ( False, Url ) ->
+            fieldView_ (inputToHtml view "url" [])
+
         ( False, Password ) ->
             fieldView_ (inputToHtml view "password" [])
 
@@ -949,6 +952,9 @@ fieldTypeToString type_ =
 
         Email ->
             "email"
+
+        Url ->
+            "url"
 
         Password ->
             "password"

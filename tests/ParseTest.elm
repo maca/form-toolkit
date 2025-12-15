@@ -14,6 +14,7 @@ import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector exposing (attribute)
 import Time
+import Url
 
 
 suite : Test
@@ -283,6 +284,122 @@ suite =
                     EmailInvalid (Just StringField)
                         |> Error.toEnglish
                         |> Expect.equal "Please enter a valid email address"
+            , test "valid url passes validation" <|
+                \_ ->
+                    let
+                        validUrlString =
+                            "https://example.com"
+
+                        urlField =
+                            Field.text
+                                [ Field.identifier StringField
+                                , Field.value (Value.string validUrlString)
+                                ]
+                    in
+                    Parse.parse Parse.url urlField
+                        |> Result.map Url.toString
+                        |> Expect.equal (Ok "https://example.com/")
+            , test "invalid url fails validation" <|
+                \_ ->
+                    let
+                        invalidUrl =
+                            "not-a-url"
+
+                        urlField =
+                            Field.text
+                                [ Field.identifier StringField
+                                , Field.value (Value.string invalidUrl)
+                                ]
+                    in
+                    Parse.parse Parse.url urlField
+                        |> Expect.equal (Err (UrlInvalid (Just StringField)))
+            , test "UrlInvalid error has correct English translation" <|
+                \_ ->
+                    UrlInvalid (Just StringField)
+                        |> Error.toEnglish
+                        |> Expect.equal "Please enter a valid URL"
+            , test "url validation only applies to url fields" <|
+                \_ ->
+                    let
+                        invalidUrl =
+                            "not-a-url"
+
+                        textField =
+                            Field.text
+                                [ Field.identifier StringField
+                                , Field.value (Value.string invalidUrl)
+                                ]
+
+                        urlField =
+                            Field.url
+                                [ Field.identifier StringField
+                                , Field.value (Value.string invalidUrl)
+                                ]
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Parse.parse Parse.string textField
+                                |> Expect.equal (Ok invalidUrl)
+                        , \_ ->
+                            Parse.parse Parse.string urlField
+                                |> Expect.equal (Err (UrlInvalid (Just StringField)))
+                        ]
+                        ()
+            , test "valid url with Field.url passes validation" <|
+                \_ ->
+                    let
+                        validUrl =
+                            "https://example.com"
+
+                        urlField =
+                            Field.url
+                                [ Field.identifier StringField
+                                , Field.value (Value.string validUrl)
+                                ]
+                    in
+                    Parse.parse Parse.string urlField
+                        |> Expect.equal (Ok validUrl)
+            , test "url validation edge cases" <|
+                \_ ->
+                    let
+                        testUrl urlString shouldPass =
+                            let
+                                urlField =
+                                    Field.url
+                                        [ Field.identifier StringField
+                                        , Field.value (Value.string urlString)
+                                        ]
+                            in
+                            if shouldPass then
+                                Parse.parse Parse.string urlField
+                                    |> Expect.equal (Ok urlString)
+
+                            else
+                                Parse.parse Parse.string urlField
+                                    |> Expect.equal (Err (UrlInvalid (Just StringField)))
+                    in
+                    Expect.all
+                        [ \_ -> testUrl "https://example.com" True
+                        , \_ -> testUrl "http://example.com" True
+                        , \_ -> testUrl "https://example.com/path" True
+                        , \_ -> testUrl "https://example.com/path?query=value" True
+                        , \_ -> testUrl "not-a-url" False
+                        , \_ -> testUrl "example.com" False
+                        , \_ -> testUrl "//example.com" False
+                        , \_ -> testUrl "http://" False
+                        ]
+                        ()
+            , test "empty url field validation" <|
+                \_ ->
+                    let
+                        emptyUrlField =
+                            Field.url
+                                [ Field.identifier StringField
+                                , Field.required True
+                                ]
+                    in
+                    Parse.parse Parse.string emptyUrlField
+                        |> Expect.equal (Err (IsBlank (Just StringField)))
             , test "parsing json fails when required fields are not filled" <|
                 \_ ->
                     let

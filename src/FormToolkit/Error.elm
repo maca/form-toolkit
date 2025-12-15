@@ -26,6 +26,7 @@ type Error id
     | HasNoName (Maybe id)
     | PatternError (Maybe id)
     | EmailInvalid (Maybe id)
+    | UrlInvalid (Maybe id)
     | IsGroupNotInput (Maybe id)
     | NoOptionsProvided (Maybe id)
     | InvalidValue (Maybe id)
@@ -69,6 +70,9 @@ toEnglish error =
 
         EmailInvalid _ ->
             "Please enter a valid email address"
+
+        UrlInvalid _ ->
+            "Please enter a valid URL"
 
         IsGroupNotInput _ ->
             "A group cannot have a value but the decoder is attempting to read the value"

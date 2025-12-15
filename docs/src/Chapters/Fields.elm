@@ -24,6 +24,7 @@ type Msg
     = TextChanged (Field.Msg ())
     | TextareaChanged (Field.Msg ())
     | EmailChanged (Field.Msg ())
+    | UrlChanged (Field.Msg ())
     | FieldWithPatternChanged (Field.Msg ())
     | PasswordChanged (Field.Msg ())
     | AutocompleteTextChanged (Field.Msg ())
@@ -45,6 +46,7 @@ type alias Model =
     { text : Field ()
     , textarea : Field ()
     , email : Field ()
+    , url : Field ()
     , pattern : Field ()
     , password : Field ()
     , autocompleteText : Field ()
@@ -68,6 +70,7 @@ init =
     { text = textField
     , textarea = textareaField
     , email = emailField
+    , url = urlField
     , pattern = patternField
     , password = passwordField
     , autocompleteText = autocompleteTextField
@@ -120,6 +123,16 @@ update msg book =
                             Parse.parseUpdate Parse.string fieldMsg model.email
                     in
                     ( { model | email = updatedField }
+                    , Task.perform (Actions.logActionWithString "Result")
+                        (Task.succeed (Debug.toString result))
+                    )
+
+                UrlChanged fieldMsg ->
+                    let
+                        ( updatedField, result ) =
+                            Parse.parseUpdate Parse.string fieldMsg model.url
+                    in
+                    ( { model | url = updatedField }
                     , Task.perform (Actions.logActionWithString "Result")
                         (Task.succeed (Debug.toString result))
                     )
@@ -311,6 +324,14 @@ chapter =
                     Html.div [ Attr.class "milligram" ]
                         [ book.fields.email
                             |> Field.toHtml EmailChanged
+                        ]
+                        |> Html.map (Actions.updateStateWithCmdWith update)
+              )
+            , ( "Url"
+              , \book ->
+                    Html.div [ Attr.class "milligram" ]
+                        [ book.fields.url
+                            |> Field.toHtml UrlChanged
                         ]
                         |> Html.map (Actions.updateStateWithCmdWith update)
               )
@@ -532,6 +553,25 @@ emailField =
 <component with-label="Email"/>
 
 Parsed using `Parse.string`.
+
+
+### URL
+
+URL validation with proper input type and built-in validation.
+
+```elm
+urlField : Field ()
+urlField =
+    Field.url
+        [ Field.label "URL Field"
+        , Field.placeholder "https://example.com"
+        , Field.required True
+        ]
+```
+
+<component with-label="Url"/>
+
+Parsed using `Parse.url` to return a `Url.Url` type.
 
 
 ### Password
@@ -964,6 +1004,15 @@ emailField =
     Field.email
         [ Field.label "Email Field"
         , Field.placeholder "your@email.com"
+        , Field.required True
+        ]
+
+
+urlField : Field ()
+urlField =
+    Field.url
+        [ Field.label "URL Field"
+        , Field.placeholder "https://example.com"
         , Field.required True
         ]
 

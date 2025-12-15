@@ -2,7 +2,7 @@ module FormToolkit.Parse exposing
     ( Parser, parse, parseUpdate, parseValidate
     , field
     , string, int, float, bool, posix, maybe, list, oneOf
-    , stringLenient, formattedString, email
+    , stringLenient, formattedString, email, url
     , value, json
     , succeed, fail
     , map, map2, map3, map4, map5, map6, map7, map8
@@ -20,7 +20,7 @@ know `Json.Decode` you know how to use this module ;)
 
 @docs field
 @docs string, int, float, bool, posix, maybe, list, oneOf
-@docs stringLenient, formattedString, email
+@docs stringLenient, formattedString, email, url
 @docs value, json
 @docs succeed, fail
 
@@ -49,6 +49,7 @@ import Json.Encode
 import List.Extra
 import RoseTree.Tree as Tree
 import Time
+import Url
 
 
 {-| Look away ;)
@@ -406,7 +407,8 @@ value =
     parseValidValue (always Ok)
 
 
-{-| -}
+{-| Parses the input value as an email address string, validating the email format.
+-}
 email : Parser id String
 email =
     parseValidValue
@@ -420,6 +422,26 @@ email =
 
                         else
                             Err (EmailInvalid id)
+                    )
+        )
+
+
+{-| Parses the input value as a URL, returning a `Url.Url` if valid.
+-}
+url : Parser id Url.Url
+url =
+    parseValidValue
+        (\id val ->
+            Value.toString val
+                |> Result.fromMaybe (Error.ParseError id)
+                |> Result.andThen
+                    (\str ->
+                        case Url.fromString str of
+                            Just validUrl ->
+                                Ok validUrl
+
+                            Nothing ->
+                                Err (UrlInvalid id)
                     )
         )
 

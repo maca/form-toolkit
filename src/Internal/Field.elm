@@ -24,6 +24,7 @@ type FieldType id value err
     = Text
     | TextArea
     | Email
+    | Url
     | Password
     | StrictAutocomplete
     | Integer
@@ -144,6 +145,9 @@ inputStringToValue input str =
                 Internal.Value.provisional str
 
         Email ->
+            Internal.Value.fromNonBlankString str
+
+        Url ->
             Internal.Value.fromNonBlankString str
 
         Integer ->

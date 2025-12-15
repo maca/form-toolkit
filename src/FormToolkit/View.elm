@@ -42,6 +42,7 @@ type FieldType
     = Text
     | TextArea
     | Email
+    | Url
     | Password
     | StrictAutocomplete
     | Integer
@@ -543,6 +544,9 @@ mapFieldType fieldType =
 
         Internal.Field.Email ->
             Email
+
+        Internal.Field.Url ->
+            Url
 
         Internal.Field.Password ->
             Password

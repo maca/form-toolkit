@@ -317,6 +317,9 @@ errorToSpanish attributes =
                 Error.EmailInvalid _ ->
                     "Debe ser una dirección de correo válida"
 
+                Error.UrlInvalid _ ->
+                    "Debe ser una URL válida"
+
                 Error.IsGroupNotInput _ ->
                     "Error en el grupo"
 

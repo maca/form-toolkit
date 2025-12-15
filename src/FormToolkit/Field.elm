@@ -1,6 +1,6 @@
 module FormToolkit.Field exposing
     ( Field(..), Msg(..), update, toHtml
-    , text, textarea, email, password, strictAutocomplete
+    , text, textarea, email, url, password, strictAutocomplete
     , int, float
     , date, month, datetime
     , select, radio, checkbox
@@ -29,7 +29,7 @@ their attributes, update, and render them.
 
 # Field types
 
-@docs text, textarea, email, password, strictAutocomplete
+@docs text, textarea, email, url, password, strictAutocomplete
 @docs int, float
 @docs date, month, datetime
 @docs select, radio, checkbox
@@ -82,6 +82,7 @@ import List.Extra
 import RoseTree.Path as Path
 import RoseTree.Tree as Tree
 import String.Extra
+import Url
 
 
 type alias Node id =
@@ -285,6 +286,18 @@ textarea =
 email : List (Attribute id val) -> Field id
 email =
     init Email
+
+
+{-| Builds a URL input field.
+
+    urlField : Field id
+    urlField =
+        url [ label "Website", required True ]
+
+-}
+url : List (Attribute id val) -> Field id
+url =
+    init Url
 
 
 {-| Builds a password input field.
@@ -1394,6 +1407,14 @@ checkEmail node =
                 Nothing ->
                     setError ParseError node
 
+        Url ->
+            case Internal.Value.toString attrs.value |> Maybe.andThen Url.fromString of
+                Just _ ->
+                    node
+
+                Nothing ->
+                    setError UrlInvalid node
+
         _ ->
             node
 
@@ -1501,6 +1522,9 @@ mapError transformId error =
         EmailInvalid id ->
             EmailInvalid (Maybe.map transformId id)
 
+        UrlInvalid id ->
+            UrlInvalid (Maybe.map transformId id)
+
         ParseError id ->
             ParseError (Maybe.map transformId id)
 
@@ -1540,6 +1564,9 @@ mapFieldType func errMapper fieldType =
 
         Email ->
             Email
+
+        Url ->
+            Url
 
         Password ->
             Password
