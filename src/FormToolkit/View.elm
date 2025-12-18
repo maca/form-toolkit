@@ -27,7 +27,6 @@ module FormToolkit.View exposing
 
 -}
 
-import File
 import FormToolkit.Error exposing (Error)
 import FormToolkit.Field as Field exposing (Field(..), Msg)
 import FormToolkit.Value exposing (Value(..))
@@ -94,6 +93,7 @@ type alias FieldAttributes id =
     , disabled : Bool
     , hidden : Bool
     , pattern : List Internal.Utils.MaskToken
+    , acceptedMimeTypes : List String
     }
 
 
