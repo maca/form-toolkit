@@ -11,7 +11,7 @@ module FormToolkit.Field exposing
     , selectionStart, selectionEnd
     , options, stringOptions, min, max, step, autogrow
     , class, classList
-    , disabled, hidden, noattr, pattern
+    , disabled, hidden, noattr, pattern, multiple
     , copies, repeatableMin, repeatableMax
     , updateAttribute, updateAttributes, updateWithId
     , updateValuesFromJson
@@ -45,7 +45,7 @@ their attributes, update, and render them.
 @docs selectionStart, selectionEnd
 @docs options, stringOptions, min, max, step, autogrow
 @docs class, classList
-@docs disabled, hidden, noattr, pattern
+@docs disabled, hidden, noattr, pattern, multiple
 
 
 # Groups
@@ -120,7 +120,7 @@ type alias Path =
 type Msg id
     = InputChanged (Maybe id) Path Internal.Value.Value { selectionStart : Int, selectionEnd : Int }
     | OnCheck (Maybe id) Path Bool
-    | FileSelected (Maybe id) Path File
+    | FileSelected (Maybe id) Path (List File)
     | InputFocused (Maybe id) Path
     | InputBlured (Maybe id) Path
     | InputsAdded (Maybe id) Path
@@ -161,12 +161,12 @@ update msg (Field field) =
                     )
                     field
 
-            FileSelected _ path fileValue ->
+            FileSelected _ path files ->
                 updateAt path
                     (Tree.updateValue
                         (\attrs ->
                             { attrs
-                                | value = Internal.Value.file fileValue
+                                | value = Internal.Value.Files files
                                 , errors = []
                                 , status = Editing
                             }
@@ -250,7 +250,7 @@ toHtml onChange (Field field) =
     Internal.View.init
         { onChange = \id path val cursorPos -> onChange (InputChanged id path val cursorPos)
         , onCheck = \id path checked -> onChange (OnCheck id path checked)
-        , onFileSelect = \id path fileValue -> onChange (FileSelected id path fileValue)
+        , onFileSelect = \id path files -> onChange (FileSelected id path files)
         , onFocus = \id path -> onChange (InputFocused id path)
         , onBlur = \id path -> onChange (InputBlured id path)
         , onAdd = \id path -> onChange (InputsAdded id path)
@@ -463,6 +463,7 @@ checkbox attrs =
 {-| Builds a file upload input field with drag and drop support.
 
 The min and max attributes can be used to validate file size in bytes.
+For multiple file uploads, use the [multiple](#multiple) attribute.
 
     avatarField : Field id
     avatarField =
@@ -587,6 +588,7 @@ initAttributes fieldType =
         , disabled = False
         , hidden = False
         , pattern = []
+        , multiple = False
         }
 
 
@@ -878,6 +880,34 @@ disabled isDisabled =
 hidden : Bool -> Attribute id val
 hidden isHidden =
     Attribute (\field -> { field | hidden = isHidden })
+
+
+{-| Sets whether a file input accepts multiple files. When set to True, the file
+input will allow selecting multiple files.
+
+When multiple is True, file size validation is applied to each individual file.
+Use `Parse.list Parse.file` to parse all selected files.
+
+    import FormToolkit.Parse as Parse
+    import FormToolkit.Value as Value
+
+    documentsField : Field id
+    documentsField =
+        file
+            [ label "Documents"
+            , hint "Upload up to 5 documents (max 10MB each)"
+            , multiple True
+            , max (Value.int 10485760)
+            ]
+
+    documentsField
+        |> Parse.parse (Parse.list Parse.file)
+    --> Ok [ file1, file2, file3 ]
+
+-}
+multiple : Bool -> Attribute id val
+multiple isMultiple =
+    Attribute (\field -> { field | multiple = isMultiple })
 
 
 {-| An attribute that does nothing.
@@ -1387,45 +1417,117 @@ checkInRange node =
         maxVal =
             Value.Value attrs.max
     in
-    case
-        ( Internal.Value.compare attrs.value attrs.min
-        , Internal.Value.compare attrs.value attrs.max
-        )
-    of
-        ( Just LT, Just _ ) ->
-            setError
-                (\id ->
-                    ValueNotInRange id
-                        { value = val, min = minVal, max = maxVal }
-                )
-                node
-
-        ( Just _, Just GT ) ->
-            setError
-                (\id ->
-                    ValueNotInRange id
-                        { value = val, min = minVal, max = maxVal }
-                )
-                node
-
-        ( Just LT, Nothing ) ->
-            setError
-                (\id ->
-                    ValueTooSmall id
-                        { value = val, min = minVal }
-                )
-                node
-
-        ( Nothing, Just GT ) ->
-            setError
-                (\id ->
-                    ValueTooLarge id
-                        { value = val, max = maxVal }
-                )
-                node
+    case ( attrs.fieldType, attrs.value, attrs.multiple ) of
+        ( File, Internal.Value.Files files, True ) ->
+            checkFileSizes node files minVal maxVal
 
         _ ->
-            node
+            case
+                ( Internal.Value.compare attrs.value attrs.min
+                , Internal.Value.compare attrs.value attrs.max
+                )
+            of
+                ( Just LT, Just _ ) ->
+                    setError
+                        (\id ->
+                            ValueNotInRange id
+                                { value = val, min = minVal, max = maxVal }
+                        )
+                        node
+
+                ( Just _, Just GT ) ->
+                    setError
+                        (\id ->
+                            ValueNotInRange id
+                                { value = val, min = minVal, max = maxVal }
+                        )
+                        node
+
+                ( Just LT, Nothing ) ->
+                    setError
+                        (\id ->
+                            ValueTooSmall id
+                                { value = val, min = minVal }
+                        )
+                        node
+
+                ( Nothing, Just GT ) ->
+                    setError
+                        (\id ->
+                            ValueTooLarge id
+                                { value = val, max = maxVal }
+                        )
+                        node
+
+                _ ->
+                    node
+
+
+checkFileSizes : Node id -> List File.File -> Value.Value -> Value.Value -> Node id
+checkFileSizes node files minVal maxVal =
+    let
+        attrs =
+            Tree.value node
+
+        minSize =
+            Internal.Value.toInt attrs.min
+
+        maxSize =
+            Internal.Value.toInt attrs.max
+
+        fileOutOfRange file_ =
+            let
+                size =
+                    File.size file_
+            in
+            case ( minSize, maxSize ) of
+                ( Just minBytes, Just maxBytes ) ->
+                    size < minBytes || size > maxBytes
+
+                ( Just minBytes, Nothing ) ->
+                    size < minBytes
+
+                ( Nothing, Just maxBytes ) ->
+                    size > maxBytes
+
+                ( Nothing, Nothing ) ->
+                    False
+    in
+    if List.any fileOutOfRange files then
+        let
+            val =
+                Value.Value attrs.value
+        in
+        case ( minSize, maxSize ) of
+            ( Just _, Just _ ) ->
+                setError
+                    (\id ->
+                        ValueNotInRange id
+                            { value = val, min = minVal, max = maxVal }
+                    )
+                    node
+
+            ( Just _, Nothing ) ->
+                setError
+                    (\id ->
+                        ValueTooSmall id
+                            { value = val, min = minVal }
+                    )
+                    node
+
+            ( Nothing, Just _ ) ->
+                setError
+                    (\id ->
+                        ValueTooLarge id
+                            { value = val, max = maxVal }
+                    )
+                    node
+
+            ( Nothing, Nothing ) ->
+                node
+
+    else
+        node
 
 
 checkEmail : Node id -> Node id

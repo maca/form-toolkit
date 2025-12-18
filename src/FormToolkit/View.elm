@@ -94,6 +94,7 @@ type alias FieldAttributes id =
     , disabled : Bool
     , hidden : Bool
     , pattern : List Internal.Utils.MaskToken
+    , multiple : Bool
     }
 
 
@@ -122,7 +123,7 @@ fromField toMsg (Field field) =
         (Internal.View.init
             { onChange = \id path value cursorPos -> toMsg (Field.InputChanged id path value cursorPos)
             , onCheck = \id path checked -> toMsg (Field.OnCheck id path checked)
-            , onFileSelect = \id path fileValue -> toMsg (Field.FileSelected id path fileValue)
+            , onFileSelect = \id path files -> toMsg (Field.FileSelected id path files)
             , onFocus = \id path -> toMsg (Field.InputFocused id path)
             , onBlur = \id path -> toMsg (Field.InputBlured id path)
             , onAdd = \id path -> toMsg (Field.InputsAdded id path)

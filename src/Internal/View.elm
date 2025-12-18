@@ -29,7 +29,7 @@ type alias Attributes id =
 type alias View id msg =
     { onChange : Maybe id -> List Int -> Internal.Value.Value -> { selectionStart : Int, selectionEnd : Int } -> msg
     , onCheck : Maybe id -> List Int -> Bool -> msg
-    , onFileSelect : Maybe id -> List Int -> File.File -> msg
+    , onFileSelect : Maybe id -> List Int -> List File.File -> msg
     , onFocus : Maybe id -> List Int -> msg
     , onBlur : Maybe id -> List Int -> msg
     , onAdd : Maybe id -> List Int -> msg
@@ -91,7 +91,7 @@ type alias RepeatableFieldView id msg =
 init :
     { onChange : Maybe id -> List Int -> Internal.Value.Value -> { selectionStart : Int, selectionEnd : Int } -> msg
     , onCheck : Maybe id -> List Int -> Bool -> msg
-    , onFileSelect : Maybe id -> List Int -> File.File -> msg
+    , onFileSelect : Maybe id -> List Int -> List File.File -> msg
     , onFocus : Maybe id -> List Int -> msg
     , onBlur : Maybe id -> List Int -> msg
     , onAdd : Maybe id -> List Int -> msg
@@ -1041,13 +1041,25 @@ fileInputToHtml view element =
         attrs =
             Tree.value view.root
 
-        fileDecoder =
+        filesDecoder =
             Json.Decode.at [ "target", "files" ]
-                (Json.Decode.index 0 File.decoder)
+                (if attrs.multiple then
+                    decodeFileList
 
-        dropDecoder =
+                 else
+                    Json.Decode.map List.singleton
+                        (Json.Decode.index 0 File.decoder)
+                )
+
+        dropFilesDecoder =
             Json.Decode.at [ "dataTransfer", "files" ]
-                (Json.Decode.index 0 File.decoder)
+                (if attrs.multiple then
+                    decodeFileList
+
+                 else
+                    Json.Decode.map List.singleton
+                        (Json.Decode.index 0 File.decoder)
+                )
 
         hijackOn event decoder =
             Events.preventDefaultOn event
@@ -1056,7 +1068,7 @@ fileInputToHtml view element =
         onFileChange =
             Json.Decode.map
                 (view.onFileSelect attrs.identifier view.path)
-                fileDecoder
+                filesDecoder
                 |> Events.on "change"
 
         fileName =
@@ -1069,6 +1081,13 @@ fileInputToHtml view element =
 
             else
                 Attributes.class ""
+
+        multipleAttribute =
+            if attrs.multiple then
+                Attributes.multiple True
+
+            else
+                Attributes.class ""
     in
     Html.div
         ([ Attributes.class "file-input"
@@ -1077,7 +1096,7 @@ fileInputToHtml view element =
          , hijackOn "dragover" (Json.Decode.succeed (view.onFocus attrs.identifier view.path))
          , hijackOn "dragleave" (Json.Decode.succeed (view.onBlur attrs.identifier view.path))
          , hijackOn "drop"
-            (Json.Decode.map (view.onFileSelect attrs.identifier view.path) dropDecoder)
+            (Json.Decode.map (view.onFileSelect attrs.identifier view.path) dropFilesDecoder)
          ]
             ++ element
         )
@@ -1090,6 +1109,7 @@ fileInputToHtml view element =
             , nameAttribute view.root
             , ariaDescribedByAttribute view.root view.path
             , ariaInvalidAttribute view.root
+            , multipleAttribute
             , onFileChange
             , Events.onFocus (view.onFocus attrs.identifier view.path)
             , Events.onBlur (view.onBlur attrs.identifier view.path)
@@ -1106,3 +1126,23 @@ fileInputToHtml view element =
                 Html.text fileName
             ]
         ]
+
+
+decodeFileList : Json.Decode.Decoder (List File.File)
+decodeFileList =
+    Json.Decode.field "length" Json.Decode.int
+        |> Json.Decode.andThen
+            (\length ->
+                decodeFileListHelper 0 length
+            )
+
+
+decodeFileListHelper : Int -> Int -> Json.Decode.Decoder (List File.File)
+decodeFileListHelper index length =
+    if index >= length then
+        Json.Decode.succeed []
+
+    else
+        Json.Decode.map2 (::)
+            (Json.Decode.index index File.decoder)
+            (decodeFileListHelper (index + 1) length)

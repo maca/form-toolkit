@@ -19,6 +19,7 @@ module Internal.Value exposing
     , timeFromString
     , toBool
     , toFile
+    , toFiles
     , toFloat
     , toInt
     , toPosix
@@ -41,7 +42,7 @@ type Value
     | LocalTime Posix
     | Boolean Bool
     | Provisional String
-    | FileValue File
+    | Files (List File)
     | Blank
 
 
@@ -76,8 +77,17 @@ toString value =
         Provisional str ->
             Just str
 
-        FileValue fileValue ->
-            Just (File.name fileValue)
+        Files files ->
+            case files of
+                [ file_ ] ->
+                    Just (File.name file_)
+
+                _ ->
+                    Just
+                        (files
+                            |> List.map File.name
+                            |> String.join ", "
+                        )
 
         Blank ->
             Nothing
@@ -138,8 +148,8 @@ toPosix value =
 toFile : Value -> Maybe File
 toFile value =
     case value of
-        FileValue val ->
-            Just val
+        Files files ->
+            List.head files
 
         _ ->
             Nothing
@@ -157,7 +167,7 @@ encode value =
         Boolean b ->
             Encode.bool b
 
-        FileValue _ ->
+        Files _ ->
             Debug.todo "crash"
 
         Blank ->
@@ -262,8 +272,9 @@ toNumber value =
         LocalTime posix ->
             Just <| Basics.toFloat (Time.posixToMillis posix)
 
-        FileValue fileValue ->
-            Just <| Basics.toFloat (File.size fileValue)
+        Files files ->
+            List.head files
+                |> Maybe.map (File.size >> Basics.toFloat)
 
         _ ->
             Nothing
@@ -297,5 +308,15 @@ provisional str =
 
 
 file : File -> Value
-file =
-    FileValue
+file f =
+    Files [ f ]
+
+
+toFiles : Value -> List File
+toFiles value =
+    case value of
+        Files files ->
+            files
+
+        _ ->
+            []
