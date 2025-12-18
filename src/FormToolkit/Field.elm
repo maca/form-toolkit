@@ -11,7 +11,7 @@ module FormToolkit.Field exposing
     , selectionStart, selectionEnd
     , options, stringOptions, min, max, step, autogrow
     , class, classList
-    , disabled, hidden, noattr, pattern
+    , disabled, hidden, noattr, pattern, accept
     , copies, repeatableMin, repeatableMax
     , updateAttribute, updateAttributes, updateWithId
     , updateValuesFromJson
@@ -45,7 +45,7 @@ their attributes, update, and render them.
 @docs selectionStart, selectionEnd
 @docs options, stringOptions, min, max, step, autogrow
 @docs class, classList
-@docs disabled, hidden, noattr, pattern
+@docs disabled, hidden, noattr, pattern, accept
 
 
 # Groups
@@ -587,6 +587,7 @@ initAttributes fieldType =
         , disabled = False
         , hidden = False
         , pattern = []
+        , acceptedMimeTypes = []
         }
 
 
@@ -910,6 +911,27 @@ pattern patternString =
     Attribute
         (\field ->
             { field | pattern = Internal.Utils.parseMask patternString }
+        )
+
+
+{-| Sets accepted MIME types for file input. Supports wildcards like "image/_" or "_/\*".
+
+    file
+        [ label "Profile Picture"
+        , accept [ "image/png", "image/jpeg", "image/gif" ]
+        ]
+
+    file
+        [ label "Any Image"
+        , accept [ "image/*" ]
+        ]
+
+-}
+accept : List String -> Attribute id val
+accept mimeTypes =
+    Attribute
+        (\field ->
+            { field | acceptedMimeTypes = mimeTypes }
         )
 
 
@@ -1344,6 +1366,7 @@ validateNode node =
         , ifNotBlank checkInRange
         , ifNotBlank checkEmailAndUrl
         , ifNotBlank checkPattern
+        , ifNotBlank checkMimeType
         ]
 
 
@@ -1467,6 +1490,68 @@ validateUrl urlString =
         |> Url.fromString
 
 
+checkMimeType : Node id -> Node id
+checkMimeType node =
+    let
+        attrs =
+            Tree.value node
+    in
+    case ( attrs.fieldType, attrs.acceptedMimeTypes ) of
+        ( File, [] ) ->
+            node
+
+        ( File, accepted ) ->
+            case Internal.Value.toFile attrs.value of
+                Just fileValue ->
+                    let
+                        fileMime =
+                            File.mime fileValue
+                    in
+                    if isMimeTypeAccepted fileMime accepted then
+                        node
+
+                    else
+                        setError
+                            (\id ->
+                                MimeTypeInvalid id
+                                    { mime = fileMime
+                                    , accepted = accepted
+                                    }
+                            )
+                            node
+
+                Nothing ->
+                    node
+
+        _ ->
+            node
+
+
+isMimeTypeAccepted : String -> List String -> Bool
+isMimeTypeAccepted fileMime acceptedTypes =
+    List.any (matchesMimeType fileMime) acceptedTypes
+
+
+matchesMimeType : String -> String -> Bool
+matchesMimeType fileMime mimePattern =
+    if mimePattern == "*/*" || mimePattern == "*" then
+        True
+
+    else
+        case String.split "/" mimePattern of
+            [ typePattern, subTypePattern ] ->
+                case String.split "/" fileMime of
+                    [ fileType, fileSubType ] ->
+                        (typePattern == "*" || typePattern == fileType)
+                            && (subTypePattern == "*" || subTypePattern == fileSubType)
+
+                    _ ->
+                        False
+
+            _ ->
+                fileMime == mimePattern
+
+
 checkPattern : Node id -> Node id
 checkPattern node =
     let
@@ -1572,6 +1657,9 @@ mapError transformId error =
 
         UrlInvalid id ->
             UrlInvalid (Maybe.map transformId id)
+
+        MimeTypeInvalid id data ->
+            MimeTypeInvalid (Maybe.map transformId id) data
 
         ParseError id ->
             ParseError (Maybe.map transformId id)

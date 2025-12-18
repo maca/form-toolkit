@@ -66,6 +66,7 @@ type alias Attributes id fieldType value status err =
     , disabled : Bool
     , hidden : Bool
     , pattern : List Internal.Utils.MaskToken
+    , acceptedMimeTypes : List String
     }
 
 
@@ -103,6 +104,7 @@ mapAttributes func errMapper typeMapper valueMapper statusMapper input =
     , disabled = input.disabled
     , hidden = input.hidden
     , pattern = input.pattern
+    , acceptedMimeTypes = input.acceptedMimeTypes
     }
 
 

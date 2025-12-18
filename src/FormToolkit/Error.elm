@@ -27,6 +27,7 @@ type Error id
     | PatternError (Maybe id)
     | EmailInvalid (Maybe id)
     | UrlInvalid (Maybe id)
+    | MimeTypeInvalid (Maybe id) { mime : String, accepted : List String }
     | IsGroupNotInput (Maybe id)
     | NoOptionsProvided (Maybe id)
     | InvalidValue (Maybe id)
@@ -73,6 +74,9 @@ toEnglish error =
 
         UrlInvalid _ ->
             "Please enter a valid URL"
+
+        MimeTypeInvalid _ data ->
+            "File type '" ++ data.mime ++ "' is not accepted. Accepted types: " ++ String.join ", " data.accepted
 
         IsGroupNotInput _ ->
             "A group cannot have a value but the decoder is attempting to read the value"

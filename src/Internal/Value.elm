@@ -157,8 +157,12 @@ encode value =
         Boolean b ->
             Encode.bool b
 
-        FileValue _ ->
-            Debug.todo "crash"
+        FileValue fileValue ->
+            Encode.object
+                [ ( "name", Encode.string (File.name fileValue) )
+                , ( "size", Encode.int (File.size fileValue) )
+                , ( "mime", Encode.string (File.mime fileValue) )
+                ]
 
         Blank ->
             Encode.null

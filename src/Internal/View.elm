@@ -1082,18 +1082,26 @@ fileInputToHtml view element =
             ++ element
         )
         [ Html.input
-            [ Attributes.type_ "file"
-            , Attributes.id (inputId view.root view.path)
-            , Attributes.required attrs.isRequired
-            , Attributes.disabled attrs.disabled
-            , Attributes.placeholder (Maybe.withDefault "" attrs.placeholder)
-            , nameAttribute view.root
-            , ariaDescribedByAttribute view.root view.path
-            , ariaInvalidAttribute view.root
-            , onFileChange
-            , Events.onFocus (view.onFocus attrs.identifier view.path)
-            , Events.onBlur (view.onBlur attrs.identifier view.path)
-            ]
+            (List.concat
+                [ [ Attributes.type_ "file"
+                  , Attributes.id (inputId view.root view.path)
+                  , Attributes.required attrs.isRequired
+                  , Attributes.disabled attrs.disabled
+                  , Attributes.placeholder (Maybe.withDefault "" attrs.placeholder)
+                  , nameAttribute view.root
+                  , ariaDescribedByAttribute view.root view.path
+                  , ariaInvalidAttribute view.root
+                  , onFileChange
+                  , Events.onFocus (view.onFocus attrs.identifier view.path)
+                  , Events.onBlur (view.onBlur attrs.identifier view.path)
+                  ]
+                , if List.isEmpty attrs.acceptedMimeTypes then
+                    []
+
+                  else
+                    [ Attributes.attribute "accept" (String.join "," attrs.acceptedMimeTypes) ]
+                ]
+            )
             []
         , Html.label
             [ Attributes.for (inputId view.root view.path)
