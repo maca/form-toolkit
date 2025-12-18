@@ -4,6 +4,7 @@ module FormToolkit.Field exposing
     , int, float
     , date, month, datetime
     , select, radio, checkbox
+    , file
     , group, repeatable
     , Attribute
     , name, identifier, value, stringValue, required, label, placeholder, hint
@@ -33,6 +34,7 @@ their attributes, update, and render them.
 @docs int, float
 @docs date, month, datetime
 @docs select, radio, checkbox
+@docs file
 @docs group, repeatable
 
 
@@ -69,6 +71,7 @@ their attributes, update, and render them.
 -}
 
 import Dict exposing (Dict)
+import File exposing (File)
 import FormToolkit.Error exposing (Error(..))
 import FormToolkit.Value as Value
 import Html exposing (Html)
@@ -117,6 +120,7 @@ type alias Path =
 type Msg id
     = InputChanged (Maybe id) Path Internal.Value.Value { selectionStart : Int, selectionEnd : Int }
     | OnCheck (Maybe id) Path Bool
+    | FileSelected (Maybe id) Path File
     | InputFocused (Maybe id) Path
     | InputBlured (Maybe id) Path
     | InputsAdded (Maybe id) Path
@@ -152,6 +156,19 @@ update msg (Field field) =
                             { attrs
                                 | value = Internal.Value.fromBool checked
                                 , errors = []
+                            }
+                        )
+                    )
+                    field
+
+            FileSelected _ path fileValue ->
+                updateAt path
+                    (Tree.updateValue
+                        (\attrs ->
+                            { attrs
+                                | value = Internal.Value.file fileValue
+                                , errors = []
+                                , status = Editing
                             }
                         )
                     )
@@ -233,6 +250,7 @@ toHtml onChange (Field field) =
     Internal.View.init
         { onChange = \id path val cursorPos -> onChange (InputChanged id path val cursorPos)
         , onCheck = \id path checked -> onChange (OnCheck id path checked)
+        , onFileSelect = \id path fileValue -> onChange (FileSelected id path fileValue)
         , onFocus = \id path -> onChange (InputFocused id path)
         , onBlur = \id path -> onChange (InputBlured id path)
         , onAdd = \id path -> onChange (InputsAdded id path)
@@ -440,6 +458,25 @@ radio =
 checkbox : List (Attribute id val) -> Field id
 checkbox attrs =
     init Checkbox (value (Value.bool False) :: attrs)
+
+
+{-| Builds a file upload input field with drag and drop support.
+
+The min and max attributes can be used to validate file size in bytes.
+
+    avatarField : Field id
+    avatarField =
+        file
+            [ label "Profile Picture"
+            , hint "Upload an image file (max 5MB)"
+            , required True
+            , max (Value.int 5242880)
+            ]
+
+-}
+file : List (Attribute id val) -> Field id
+file =
+    init File
 
 
 {-| Groups a list of fields.
@@ -1608,6 +1645,9 @@ mapFieldType func errMapper fieldType =
 
         Checkbox ->
             Checkbox
+
+        File ->
+            File
 
         Group ->
             Group

@@ -27,6 +27,7 @@ module FormToolkit.View exposing
 
 -}
 
+import File
 import FormToolkit.Error exposing (Error)
 import FormToolkit.Field as Field exposing (Field(..), Msg)
 import FormToolkit.Value exposing (Value(..))
@@ -53,6 +54,7 @@ type FieldType
     | Select
     | Radio
     | Checkbox
+    | File
     | Group
     | Repeatable
 
@@ -120,6 +122,7 @@ fromField toMsg (Field field) =
         (Internal.View.init
             { onChange = \id path value cursorPos -> toMsg (Field.InputChanged id path value cursorPos)
             , onCheck = \id path checked -> toMsg (Field.OnCheck id path checked)
+            , onFileSelect = \id path fileValue -> toMsg (Field.FileSelected id path fileValue)
             , onFocus = \id path -> toMsg (Field.InputFocused id path)
             , onBlur = \id path -> toMsg (Field.InputBlured id path)
             , onAdd = \id path -> toMsg (Field.InputsAdded id path)
@@ -577,6 +580,9 @@ mapFieldType fieldType =
 
         Internal.Field.Checkbox ->
             Checkbox
+
+        Internal.Field.File ->
+            File
 
         Internal.Field.Group ->
             Group
