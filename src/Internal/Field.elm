@@ -35,6 +35,7 @@ type FieldType id value err
     | Select
     | Radio
     | Checkbox
+    | File
     | Group
     | Repeatable (Tree.Tree (Attributes id (FieldType id value err) value Status err))
 
@@ -181,6 +182,9 @@ inputStringToValue input str =
 
                 _ ->
                     Internal.Value.blank
+
+        File ->
+            Internal.Value.blank
 
         Group ->
             Internal.Value.blank

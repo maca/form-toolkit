@@ -4,6 +4,7 @@ module Internal.Value exposing
     , compare
     , dateFromString
     , encode
+    , file
     , floatFromString
     , fromBool
     , fromFloat
@@ -17,12 +18,14 @@ module Internal.Value exposing
     , provisional
     , timeFromString
     , toBool
+    , toFile
     , toFloat
     , toInt
     , toPosix
     , toString
     )
 
+import File exposing (File)
 import Iso8601
 import Json.Encode as Encode
 import String.Extra
@@ -38,6 +41,7 @@ type Value
     | LocalTime Posix
     | Boolean Bool
     | Provisional String
+    | FileValue File
     | Blank
 
 
@@ -71,6 +75,9 @@ toString value =
 
         Provisional str ->
             Just str
+
+        FileValue fileValue ->
+            Just (File.name fileValue)
 
         Blank ->
             Nothing
@@ -128,6 +135,16 @@ toPosix value =
             Nothing
 
 
+toFile : Value -> Maybe File
+toFile value =
+    case value of
+        FileValue val ->
+            Just val
+
+        _ ->
+            Nothing
+
+
 encode : Value -> Encode.Value
 encode value =
     case value of
@@ -139,6 +156,9 @@ encode value =
 
         Boolean b ->
             Encode.bool b
+
+        FileValue _ ->
+            Debug.todo "crash"
 
         Blank ->
             Encode.null
@@ -242,6 +262,9 @@ toNumber value =
         LocalTime posix ->
             Just <| Basics.toFloat (Time.posixToMillis posix)
 
+        FileValue fileValue ->
+            Just <| Basics.toFloat (File.size fileValue)
+
         _ ->
             Nothing
 
@@ -271,3 +294,8 @@ provisional str =
     String.Extra.nonBlank str
         |> Maybe.map Provisional
         |> Maybe.withDefault Blank
+
+
+file : File -> Value
+file =
+    FileValue

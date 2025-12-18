@@ -6,6 +6,7 @@ module Internal.View exposing (View, init, partial, toHtml)
 
 -}
 
+import File
 import FormToolkit.Error exposing (Error(..))
 import Html exposing (Html)
 import Html.Attributes as Attributes
@@ -28,6 +29,7 @@ type alias Attributes id =
 type alias View id msg =
     { onChange : Maybe id -> List Int -> Internal.Value.Value -> { selectionStart : Int, selectionEnd : Int } -> msg
     , onCheck : Maybe id -> List Int -> Bool -> msg
+    , onFileSelect : Maybe id -> List Int -> File.File -> msg
     , onFocus : Maybe id -> List Int -> msg
     , onBlur : Maybe id -> List Int -> msg
     , onAdd : Maybe id -> List Int -> msg
@@ -89,6 +91,7 @@ type alias RepeatableFieldView id msg =
 init :
     { onChange : Maybe id -> List Int -> Internal.Value.Value -> { selectionStart : Int, selectionEnd : Int } -> msg
     , onCheck : Maybe id -> List Int -> Bool -> msg
+    , onFileSelect : Maybe id -> List Int -> File.File -> msg
     , onFocus : Maybe id -> List Int -> msg
     , onBlur : Maybe id -> List Int -> msg
     , onAdd : Maybe id -> List Int -> msg
@@ -100,6 +103,7 @@ init :
 init attrs =
     { onChange = attrs.onChange
     , onCheck = attrs.onCheck
+    , onFileSelect = attrs.onFileSelect
     , onFocus = attrs.onFocus
     , onBlur = attrs.onBlur
     , onAdd = attrs.onAdd
@@ -219,6 +223,9 @@ toHtml view =
         ( False, Checkbox ) ->
             checkboxToHtml view
 
+        ( False, File ) ->
+            fieldView_ (fileInputToHtml view)
+
 
 labelToHtml : Maybe String -> List Int -> Node id -> (List (Html.Attribute msg) -> Html msg)
 labelToHtml label path input element =
@@ -255,6 +262,7 @@ groupToHtml view =
                         toHtml
                             { onChange = view.onChange
                             , onCheck = view.onCheck
+                            , onFileSelect = view.onFileSelect
                             , onFocus = view.onFocus
                             , onBlur = view.onBlur
                             , onAdd = view.onAdd
@@ -306,6 +314,7 @@ repeatableToHtml view =
                     toHtml
                         { onChange = view.onChange
                         , onCheck = view.onCheck
+                        , onFileSelect = view.onFileSelect
                         , onFocus = view.onFocus
                         , onBlur = view.onBlur
                         , onAdd = view.onAdd
@@ -983,6 +992,9 @@ fieldTypeToString type_ =
         Checkbox ->
             "checkbox"
 
+        File ->
+            "file"
+
         Repeatable _ ->
             "repeatable"
 
@@ -1021,3 +1033,76 @@ isAutocompleteable input =
 
         _ ->
             False
+
+
+fileInputToHtml : View id msg -> (List (Html.Attribute msg) -> Html msg)
+fileInputToHtml view element =
+    let
+        attrs =
+            Tree.value view.root
+
+        fileDecoder =
+            Json.Decode.at [ "target", "files" ]
+                (Json.Decode.index 0 File.decoder)
+
+        dropDecoder =
+            Json.Decode.at [ "dataTransfer", "files" ]
+                (Json.Decode.index 0 File.decoder)
+
+        hijackOn event decoder =
+            Events.preventDefaultOn event
+                (Json.Decode.map (\msg -> ( msg, True )) decoder)
+
+        onFileChange =
+            Json.Decode.map
+                (view.onFileSelect attrs.identifier view.path)
+                fileDecoder
+                |> Events.on "change"
+
+        fileName =
+            Internal.Value.toString attrs.value
+                |> Maybe.withDefault ""
+
+        dragOverClass =
+            if attrs.status == Focused then
+                Attributes.class "file-input-drag-over"
+
+            else
+                Attributes.class ""
+    in
+    Html.div
+        ([ Attributes.class "file-input"
+         , dragOverClass
+         , hijackOn "dragenter" (Json.Decode.succeed (view.onFocus attrs.identifier view.path))
+         , hijackOn "dragover" (Json.Decode.succeed (view.onFocus attrs.identifier view.path))
+         , hijackOn "dragleave" (Json.Decode.succeed (view.onBlur attrs.identifier view.path))
+         , hijackOn "drop"
+            (Json.Decode.map (view.onFileSelect attrs.identifier view.path) dropDecoder)
+         ]
+            ++ element
+        )
+        [ Html.input
+            [ Attributes.type_ "file"
+            , Attributes.id (inputId view.root view.path)
+            , Attributes.required attrs.isRequired
+            , Attributes.disabled attrs.disabled
+            , Attributes.placeholder (Maybe.withDefault "" attrs.placeholder)
+            , nameAttribute view.root
+            , ariaDescribedByAttribute view.root view.path
+            , ariaInvalidAttribute view.root
+            , onFileChange
+            , Events.onFocus (view.onFocus attrs.identifier view.path)
+            , Events.onBlur (view.onBlur attrs.identifier view.path)
+            ]
+            []
+        , Html.label
+            [ Attributes.for (inputId view.root view.path)
+            , Attributes.class "file-input-label"
+            ]
+            [ if String.isEmpty fileName then
+                Html.text (Maybe.withDefault "Choose file" attrs.placeholder)
+
+              else
+                Html.text fileName
+            ]
+        ]

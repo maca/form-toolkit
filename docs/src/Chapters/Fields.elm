@@ -37,6 +37,7 @@ type Msg
     | SelectChanged (Field.Msg ())
     | RadioChanged (Field.Msg ())
     | CheckboxChanged (Field.Msg ())
+    | FileChanged (Field.Msg ())
     | GroupChanged (Field.Msg ContactFields)
     | RepeatableChanged (Field.Msg ContactFields)
     | Repeatable2Changed (Field.Msg ContactFields)
@@ -59,6 +60,7 @@ type alias Model =
     , select : Field ()
     , radio : Field ()
     , checkbox : Field ()
+    , file : Field ()
     , group : Field ContactFields
     , repeatable : Field ContactFields
     , repeatableWithDefaults : Field ContactFields
@@ -83,6 +85,7 @@ init =
     , select = selectField
     , radio = radioField
     , checkbox = checkboxField
+    , file = fileField
     , group = groupField
     , repeatable = repeatableField
     , repeatableWithDefaults = repeatableFieldWithDefaults
@@ -257,6 +260,16 @@ update msg book =
                         (Task.succeed (Debug.toString result))
                     )
 
+                FileChanged fieldMsg ->
+                    let
+                        ( updatedField, result ) =
+                            Parse.parseUpdate Parse.file fieldMsg model.file
+                    in
+                    ( { model | file = updatedField }
+                    , Task.perform (Actions.logActionWithString "Result")
+                        (Task.succeed (Debug.toString result))
+                    )
+
                 GroupChanged fieldMsg ->
                     let
                         ( updatedField, result ) =
@@ -420,6 +433,14 @@ chapter =
                     Html.div [ Attr.class "milligram" ]
                         [ book.fields.checkbox
                             |> Field.toHtml CheckboxChanged
+                        ]
+                        |> Html.map (Actions.updateStateWithCmdWith update)
+              )
+            , ( "File"
+              , \book ->
+                    Html.div [ Attr.class "milligram" ]
+                        [ book.fields.file
+                            |> Field.toHtml FileChanged
                         ]
                         |> Html.map (Actions.updateStateWithCmdWith update)
               )
@@ -808,6 +829,29 @@ checkboxField =
 Parsed using `Parse.bool`.
 
 
+### File
+
+A file upload input field with drag and drop support. Files can be dropped onto
+the input area or selected via the native file picker. The `min` and `max`
+attributes can be used to validate file size in bytes.
+
+```elm
+fileField : Field ()
+fileField =
+    Field.file
+        [ Field.label "File Upload"
+        , Field.placeholder "Choose a file or drag and drop"
+        , Field.hint "Maximum file size: 5MB"
+        , Field.max (Value.int 5242880)
+        , Field.required True
+        ]
+```
+
+<component with-label="File"/>
+
+Parsed using `Parse.file`.
+
+
 ## Groupping Fields
 
 
@@ -1130,6 +1174,17 @@ checkboxField : Field ()
 checkboxField =
     Field.checkbox
         [ Field.label "Checkbox Field"
+        ]
+
+
+fileField : Field ()
+fileField =
+    Field.file
+        [ Field.label "File Upload"
+        , Field.placeholder "Choose a file or drag and drop"
+        , Field.hint "Maximum file size: 5MB"
+        , Field.max (Value.int 5242880)
+        , Field.required True
         ]
 
 

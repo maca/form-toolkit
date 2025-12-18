@@ -3,6 +3,7 @@ module FormToolkit.Parse exposing
     , field
     , string, int, float, bool, posix, maybe, list, oneOf
     , stringLenient, formattedString, email, url
+    , file
     , value, json
     , succeed, fail
     , map, map2, map3, map4, map5, map6, map7, map8
@@ -21,6 +22,7 @@ know `Json.Decode` you know how to use this module ;)
 @docs field
 @docs string, int, float, bool, posix, maybe, list, oneOf
 @docs stringLenient, formattedString, email, url
+@docs file
 @docs value, json
 @docs succeed, fail
 
@@ -38,6 +40,7 @@ know `Json.Decode` you know how to use this module ;)
 -}
 
 import Dict
+import File
 import FormToolkit.Error as Error exposing (Error(..))
 import FormToolkit.Field as Field exposing (Field(..), Msg)
 import FormToolkit.Value as Value exposing (Value(..))
@@ -243,6 +246,29 @@ posix =
     parseValidValue
         (\id val ->
             Value.toPosix val
+                |> Result.fromMaybe (Error.ParseError id)
+        )
+
+
+{-| Parses a file input value as a
+[File](https://package.elm-lang.org/packages/elm/file/latest/File#File).
+
+This parser only succeeds if the input is of type 'file' and a file has been
+uploaded.
+
+    import FormToolkit.Field as Field
+    import File
+
+    Field.file [ Field.required True ]
+        |> parse file
+        --> Ok fileValue
+
+-}
+file : Parser id File.File
+file =
+    parseValidValue
+        (\id (Value val) ->
+            Internal.Value.toFile val
                 |> Result.fromMaybe (Error.ParseError id)
         )
 
