@@ -76,6 +76,25 @@ suite =
                             |> Expect.equal (Err (NotNumber (Just StringField)))
                 ]
             ]
+        , describe "parsing maybe" <|
+            [ test "value can be blank" <|
+                \_ ->
+                    Expect.all
+                        [ \() ->
+                            Parse.parse (Parse.maybe Parse.string) (Field.text [])
+                                |> Expect.equal (Ok Nothing)
+                        , \() ->
+                            Parse.parse (Parse.maybe Parse.string) (Field.textarea [])
+                                |> Expect.equal (Ok Nothing)
+                        , \() ->
+                            Parse.parse (Parse.maybe Parse.string) (Field.url [])
+                                |> Expect.equal (Ok Nothing)
+                        , \() ->
+                            Parse.parse (Parse.maybe Parse.string) (Field.email [])
+                                |> Expect.equal (Ok Nothing)
+                        ]
+                        ()
+            ]
         , describe "encode json"
             [ test "string" <|
                 \_ ->

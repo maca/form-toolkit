@@ -1293,8 +1293,8 @@ validateTreeHelp tree =
 validateNode : Node id -> Node id
 validateNode node =
     let
-        ifNotRequired fn =
-            if (Tree.value node).isRequired && isBlank node then
+        ifNotBlank fn =
+            if isBlank node then
                 identity
 
             else
@@ -1304,9 +1304,9 @@ validateNode node =
         (clearErrors node)
         [ checkInvalidValues
         , checkRequired
-        , ifNotRequired checkInRange
-        , ifNotRequired checkEmail
-        , ifNotRequired checkPattern
+        , ifNotBlank checkInRange
+        , ifNotBlank checkEmailAndUrl
+        , ifNotBlank checkPattern
         ]
 
 
@@ -1391,8 +1391,8 @@ checkInRange node =
             node
 
 
-checkEmail : Node id -> Node id
-checkEmail node =
+checkEmailAndUrl : Node id -> Node id
+checkEmailAndUrl node =
     let
         attrs =
             Tree.value node
