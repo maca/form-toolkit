@@ -1081,7 +1081,17 @@ fileInputToHtml view element =
          ]
             ++ element
         )
-        [ Html.input
+        [ Html.label
+            [ Attributes.for (inputId view.root view.path)
+            , Attributes.class "file-input-label"
+            ]
+            [ if String.isEmpty fileName then
+                Html.text (Maybe.withDefault "Choose file" attrs.placeholder)
+
+              else
+                Html.text fileName
+            ]
+        , Html.input
             (List.concat
                 [ [ Attributes.type_ "file"
                   , Attributes.id (inputId view.root view.path)
@@ -1100,17 +1110,12 @@ fileInputToHtml view element =
 
                   else
                     [ Attributes.attribute "accept" (String.join "," attrs.acceptedMimeTypes) ]
+                , if String.isEmpty fileName then
+                    [ Attributes.value "" ]
+
+                  else
+                    []
                 ]
             )
             []
-        , Html.label
-            [ Attributes.for (inputId view.root view.path)
-            , Attributes.class "file-input-label"
-            ]
-            [ if String.isEmpty fileName then
-                Html.text (Maybe.withDefault "Choose file" attrs.placeholder)
-
-              else
-                Html.text fileName
-            ]
         ]
