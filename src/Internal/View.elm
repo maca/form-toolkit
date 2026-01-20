@@ -1110,7 +1110,10 @@ fileInputToHtml view element =
 
                   else
                     [ Attributes.attribute "accept" (String.join "," attrs.acceptedMimeTypes) ]
-                , if String.isEmpty fileName then
+                , if
+                    (Internal.Value.toString attrs.value == Nothing)
+                        && (attrs.status == Touched)
+                  then
                     [ Attributes.value "" ]
 
                   else
