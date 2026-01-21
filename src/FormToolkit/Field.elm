@@ -1303,7 +1303,11 @@ isBlank input =
 {-| Check all contained inputs and display errors for failed validations.
 -}
 validate : Field id -> Field id
-validate (Field node) =
+validate field =
+    let
+        (Field node) =
+            touch field
+    in
     node |> validateTree |> Field
 
 
