@@ -1111,8 +1111,8 @@ fileInputToHtml view element =
                   else
                     [ Attributes.attribute "accept" (String.join "," attrs.acceptedMimeTypes) ]
                 , if
-                    (Internal.Value.toString attrs.value == Nothing)
-                        && (attrs.status == Touched)
+                    Internal.Value.isBlank attrs.value
+                        && (attrs.status == Touched || attrs.status == Pristine)
                   then
                     [ Attributes.value "" ]
 
