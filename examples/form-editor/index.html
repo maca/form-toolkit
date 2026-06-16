@@ -1,0 +1,279 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Form Editor - Drag & Drop Demo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/milligram/dist/milligram.min.css">
+  <style>
+    @import url("https://cdn.jsdelivr.net/npm/css.gg@2.9.0/css/all.css");
+
+    body {
+      padding: 0;
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    html {
+      height: 100%;
+    }
+
+    #elm {
+      height: 100vh;
+      display: flex;
+    }
+
+    .schema-editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .schema-editor {
+      --element-border-radius: 0.5rem;
+      --element-spacing: 1rem;
+      --step-separation: calc(var(--element-spacing) * 2.5);
+      user-select: none;
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .schema-editor .schema-editor-panes {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 2fr 8fr 5fr;
+      grid-template-rows: 1fr;
+      gap: 0;
+    }
+
+    .schema-editor .schema-editor-palete {
+      box-sizing: border-box;
+      padding: 1rem;
+      overflow-y: auto;
+      border-right: 1px solid #ddd;
+    }
+
+    .schema-editor .schema-editor-tree {
+      box-sizing: border-box;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .schema-editor .side-pane {
+      box-sizing: border-box;
+      padding: 1rem;
+      overflow-y: auto;
+      border-left: 1px solid #ddd;
+    }
+
+    .schema-editor .editor-add {
+      padding-right: calc(var(--element-spacing) * 4);
+      margin-bottom: var(--element-spacing);
+      border-radius: var(--element-border-radius);
+      display: flex;
+    }
+
+    .schema-editor .editor-add:not(.disabled) {
+      cursor: grab;
+    }
+
+    .schema-editor .editor-add.disabled {
+      opacity: 0.5;
+    }
+
+    .schema-editor h3 {
+      font-size: 2rem;
+      line-height: 2;
+      margin: 0;
+    }
+
+    .schema-editor .schema-editor-tree > .group-element > .group,
+    .schema-editor .group-addition {
+      background: rgba(100, 150, 200, 0.3);
+    }
+
+    .schema-editor .group-element .group {
+      background: rgba(100, 200, 200, 0.4);
+    }
+
+    .schema-editor .repeatable-group {
+      background: rgba(233, 222, 193, 0.4);
+    }
+
+    .schema-editor .field-element .field,
+    .schema-editor .review-element .field,
+    .schema-editor .help-element .field,
+    .schema-editor .field-addition,
+    .schema-editor .review-addition,
+    .schema-editor .help-addition {
+      background: rgba(240, 150, 150, 0.4);
+    }
+
+    .schema-editor .group-name {
+      display: flex;
+    }
+
+    .schema-editor .element-selected > div {
+      box-shadow: 0px 0px 0px 3px rgba(155,77,202,1) inset;
+    }
+
+    .schema-editor .placeholder, .drag-dragged > * {
+      height: 40px;
+      border: 3px dashed rgba(0, 0, 0, 0.1);
+    }
+
+    .drag-dragged > * > * {
+      transform: translateX(-9999px);
+    }
+
+    .schema-editor .element {
+      padding: 0 0 var(--element-spacing) 0;
+    }
+
+    .schema-editor .element > * {
+      border-radius: var(--element-border-radius);
+      display: flex;
+    }
+
+    .schema-editor .group .element > * {
+      margin-right: 2rem;
+    }
+
+    .schema-editor .field-icon {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      opacity: 0.6;
+      margin-left: 0.125rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .schema-editor .field-icon i {
+      width: 28px;
+      height: 28px;
+      font-size: 28px;
+    }
+
+    .schema-editor .field-icon.select i {
+      top: calc(50% + 2px);
+    }
+
+    .schema-editor .field-icon.integer i {
+      left: 5px;
+    }
+
+    .schema-editor i {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      color: currentColor;
+      vertical-align: middle;
+    }
+
+    .schema-editor .drag-handle {
+      background: rgba(0, 0, 0, 0.1);
+      padding: 0 1rem;
+      border-top-left-radius: var(--element-border-radius);
+      border-bottom-left-radius: var(--element-border-radius);
+      cursor: grab;
+      margin-right: var(--element-spacing);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+    }
+
+    .schema-editor .drag-handle i {
+      font-size: 1em;
+      opacity: 0.6;
+    }
+
+    .schema-editor .editor-add .drag-handle {
+      background: none;
+      padding: 0 1rem 0 0;
+      min-width: auto;
+    }
+
+    .schema-editor .editor-add .drag-handle i {
+      min-width: 20px;
+      min-height: 20px;
+    }
+
+    .schema-editor .field-content,
+    .schema-editor .group-content {
+      flex-grow: 1;
+      cursor: pointer;
+    }
+
+    .schema-editor .field-content {
+      display: flex;
+    }
+
+    .schema-editor .group-name button {
+      padding: 0 calc(var(--element-spacing) / 2) 0 0;
+      margin: 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .schema-editor .group-fields.inline {
+      width: 100% !important;
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .schema-editor .group-fields.inline > .element {
+      flex-grow: 1;
+      flex-basis: calc((55rem - 100%) * 999);
+    }
+
+    .schema-editor .group-fields.inline > .group-element,
+    .schema-editor .group-fields.inline > .repeatable-group,
+    .schema-editor .review-element {
+      flex-basis: 100% !important;
+    }
+
+    .schema-editor .button {
+      padding: 0.5rem 1rem;
+    }
+
+    .schema-editor .button-clear {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .field {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .group, .repeatable-group {
+      flex-direction: column;
+    }
+
+    .group-fields {
+      display: flex;
+      flex-direction: column;
+      padding-left: 2rem;
+    }
+  </style>
+</head>
+
+<body>
+<div id="elm"></div>
+<script src="build/main.js"></script>
+<script>
+  var app = Elm.Main.init({ node: document.getElementById('elm') });
+</script>
+</body>
+</html>

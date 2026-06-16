@@ -1,0 +1,658 @@
+module Main exposing (main)
+
+import Browser
+import Dict
+import Editor.Drag as Drag exposing (Drag(..), Position(..))
+import Editor.Element as Element exposing (Element(..))
+import Editor.Id as Id exposing (Id)
+import Html
+    exposing
+        ( Attribute
+        , Html
+        , aside
+        , button
+        , div
+        , h3
+        , i
+        , section
+        , text
+        )
+import Html.Attributes as Attributes
+    exposing
+        ( class
+        , classList
+        , href
+        , id
+        , rel
+        , target
+        )
+import Html.Events as Events
+    exposing
+        ( on
+        , onClick
+        , onMouseDown
+        , stopPropagationOn
+        )
+import Json.Decode as Decode exposing (Decoder)
+import Locale exposing (Locale)
+
+
+main : Program () Model Msg
+main =
+    Browser.sandbox
+        { init = init
+        , view = view
+        , update = update
+        }
+
+
+type alias Model =
+    { element : Element
+    , nextNode : Id
+    , selected : Maybe Element
+    , dragAction : DragAction
+    , locale : Locale
+    }
+
+
+type DragAction
+    = None
+    | Add Element
+    | Move Element
+
+
+type Msg
+    = ElementSelected Element
+    | OpenToggled Id
+    | DragEnabled Id
+    | DragStarted DragAction
+    | DraggedOver Bool Id Position
+    | DroppedOver Id
+    | DragEnded
+    | ElementRemoved Id
+
+
+init : Model
+init =
+    let
+        ( nextId, rootElement ) =
+            Element.updateIds (Id.fromInt 1)
+                (Element.root
+                    [ ElementGroup
+                        { id = Id.unset
+                        , name = "fields"
+                        , label = Dict.empty
+                        , inline = False
+                        , elements =
+                            [ FieldElement
+                                { id = Id.unset
+                                , field = Element.TextField
+                                , name = "text_field"
+                                , isRequired = False
+                                , label = Dict.empty
+                                , placeholder = Dict.empty
+                                , hint = Dict.empty
+                                , help = Dict.empty
+                                , drag = Drag.idle
+                                }
+                            ]
+                        , isOpen = True
+                        , drag = Drag.idle
+                        }
+                    ]
+                )
+    in
+    { element = rootElement
+    , nextNode = nextId
+    , selected = Nothing
+    , dragAction = None
+    , locale = ""
+    }
+
+
+update : Msg -> Model -> Model
+update msg model =
+    case msg of
+        ElementSelected element ->
+            { model | selected = Just element }
+
+        OpenToggled elementId ->
+            { model | element = toggleOpen elementId model.element }
+
+        DragEnabled elementId ->
+            { model | element = dragChanged elementId Drag.Enabled model.element }
+
+        DragStarted dragAction ->
+            let
+                id =
+                    draggedElement dragAction
+                        |> Maybe.map Element.id
+                        |> Maybe.withDefault Id.unset
+            in
+            { model
+                | element = dragChanged id Drag.Dragged model.element
+                , dragAction = dragAction
+            }
+
+        DraggedOver isTopLevel containerId position ->
+            { model
+                | element =
+                    draggedOver isTopLevel containerId position
+                        (draggedElement model.dragAction)
+                        model.element
+            }
+
+        DroppedOver containerId ->
+            case model.dragAction of
+                Add element ->
+                    let
+                        ( nextId, element_ ) =
+                            Element.updateIds model.nextNode element
+                    in
+                    { model
+                        | element = droppedOver containerId element_ model.element
+                        , selected = Just element_
+                        , dragAction = None
+                        , nextNode = nextId
+                    }
+
+                Move element ->
+                    { model
+                        | element = droppedOver containerId element model.element
+                        , selected = Just element
+                        , dragAction = None
+                    }
+
+                None ->
+                    model
+
+        DragEnded ->
+            { model | element = dragEnded model.element }
+
+        ElementRemoved elementId ->
+            { model
+                | element = remove elementId model.element
+                , selected = Nothing
+            }
+
+
+dragChanged : Id -> Drag -> Element -> Element
+dragChanged elementId drag =
+    Element.map
+        (\element ->
+            if Element.id element == elementId then
+                Element.updateDrag drag element
+
+            else
+                element
+        )
+
+
+draggedElement : DragAction -> Maybe Element
+draggedElement dragAction =
+    case dragAction of
+        None ->
+            Nothing
+
+        Add element ->
+            Just element
+
+        Move element ->
+            Just element
+
+
+draggedOver : Bool -> Id -> Position -> Maybe Element -> Element -> Element
+draggedOver isTopLevel id position dragged editorRoot =
+    let
+        mapFunc =
+            draggedOverHelp id position
+    in
+    case dragged of
+        Just element ->
+            if not (Element.isGroup element) && isTopLevel then
+                Element.concatMap (mapFunc Nothing) editorRoot
+
+            else
+                Element.concatMap
+                    (mapFunc (Just Element.placeholder))
+                    editorRoot
+
+        Nothing ->
+            editorRoot
+
+
+draggedOverHelp : Id -> Position -> Maybe Element -> Element -> List Element
+draggedOverHelp containerId position placeholder element =
+    if Element.id element == containerId then
+        if Element.isPlaceholder element then
+            [ element ]
+
+        else
+            addPlaceholder position placeholder <|
+                if Element.isEmptyGroup element then
+                    element
+                        |> Element.open True
+                        |> Element.prepend Element.groupPlaceholder
+
+                else
+                    Element.open True element
+
+    else if Element.isPlaceholder element then
+        []
+
+    else
+        [ element ]
+
+
+addPlaceholder : Position -> Maybe Element -> Element -> List Element
+addPlaceholder position placeholder element =
+    List.filterMap identity <|
+        case position of
+            Before ->
+                [ placeholder, Just element ]
+
+            After ->
+                [ Just element, placeholder ]
+
+
+droppedOver : Id -> Element -> Element -> Element
+droppedOver containerId dropped editorRoot =
+    if Element.id editorRoot == containerId then
+        Element.prepend dropped editorRoot
+
+    else
+        editorRoot
+            |> Element.concatMap
+                (\element ->
+                    if
+                        Element.id element
+                            == containerId
+                            && Element.isPlaceholder element
+                    then
+                        [ dropped ]
+
+                    else if Element.id element == Element.id dropped then
+                        []
+
+                    else
+                        [ element ]
+                )
+
+
+dragEnded : Element -> Element
+dragEnded =
+    Element.concatMap
+        (\element ->
+            if Element.isPlaceholder element then
+                []
+
+            else
+                [ Element.updateDrag Drag.idle element ]
+        )
+
+
+toggleOpen : Id -> Element -> Element
+toggleOpen elementId =
+    Element.map
+        (\element ->
+            if Element.id element == elementId then
+                Element.toggleOpen element
+
+            else
+                element
+        )
+
+
+remove : Id -> Element -> Element
+remove elementId =
+    Element.concatMap
+        (\element ->
+            if Element.id element == elementId then
+                []
+
+            else
+                [ element ]
+        )
+
+
+view : Model -> Html Msg
+view model =
+    div [ class "schema-editor-container" ]
+        [ div [ class "schema-editor" ]
+            [ section [ class "schema-editor-panes" ]
+                [ div [ class "schema-editor-palete" ]
+                    [ addFieldHtml False Element.text
+                    , addFieldHtml False Element.checkbox
+                    , addFieldHtml False Element.integer
+                    , addFieldHtml False Element.date
+                    , addFieldHtml False Element.month
+                    , addFieldHtml False (Element.select [])
+                    , addFieldHtml False (Element.radio [])
+                    , addElementHtml False "review-addition" Element.review
+                    , addElementHtml False "help-addition" Element.help
+                    , addElementHtml False "repeatable-group" Element.repeatableGroup
+                    , addElementHtml False "group-addition" Element.group
+                    ]
+                , div [ class "schema-editor-tree" ]
+                    (if Element.isEmptyGroup model.element then
+                        [ placeholderHtml model.element ]
+
+                     else
+                        let
+                            selected =
+                                model.selected
+                        in
+                        model.element
+                            |> Element.elements
+                            |> List.map (elementToHtml model.locale True selected)
+                    )
+                , sidePane model.selected
+                ]
+            ]
+        ]
+
+
+sidePane : Maybe Element -> Html Msg
+sidePane selected =
+    case selected of
+        Just element ->
+            aside [ class "side-pane" ]
+                [ h3 [] [ text "Selected Element" ]
+                , div [] [ text ("ID: " ++ idToString (Element.id element)) ]
+                , button [ onClick (ElementRemoved (Element.id element)), class "button" ]
+                    [ text "Remove Element" ]
+                ]
+
+        Nothing ->
+            aside [ class "side-pane" ] [ text "Select an element to edit" ]
+
+
+addFieldHtml : Bool -> Element -> Html Msg
+addFieldHtml disabled element =
+    addElementHtml disabled "field-addition" element
+
+
+addElementHtml : Bool -> String -> Element -> Html Msg
+addElementHtml disabled class_ element =
+    div
+        (class class_
+            :: class "editor-add"
+            :: (if disabled then
+                    [ class "disabled" ]
+
+                else
+                    [ Attributes.draggable "true"
+                    , on "dragend" <| Decode.succeed DragEnded
+                    , on "dragstart" <|
+                        Decode.succeed (DragStarted (Add element))
+                    ]
+               )
+        )
+        [ div [ class "drag-handle" ] [ icon "gg-layout-grid-small" ]
+        , elementIcon element
+        , h3 [] [ text (Element.label "" element) ]
+        ]
+
+
+elementToHtml : Locale -> Bool -> Maybe Element -> Element -> Html Msg
+elementToHtml locale isTopLevel selected element =
+    case element of
+        ElementGroup params ->
+            div
+                (class "element group-element"
+                    :: identifier element
+                    :: dragAttributes
+                        { isTopLevel = isTopLevel
+                        , selected = selected
+                        , draggable = element
+                        , container = element
+                        }
+                )
+                [ div [ class "group" ]
+                    (groupHtmlContent locale selected element params)
+                ]
+
+        RepeatableGroup params ->
+            div
+                (class "element group-element"
+                    :: identifier element
+                    :: dragAttributes
+                        { isTopLevel = isTopLevel
+                        , selected = selected
+                        , draggable = element
+                        , container = element
+                        }
+                )
+                [ div [ class "repeatable-group" ]
+                    (groupHtmlContent locale selected element params)
+                ]
+
+        FieldElement _ ->
+            fieldHtml
+                { locale = locale
+                , selectedNode = selected
+                , nodeClass = "field-element"
+                , isTopLevel = isTopLevel
+                , element = element
+                }
+
+        Review _ ->
+            fieldHtml
+                { locale = locale
+                , selectedNode = selected
+                , nodeClass = "review-element"
+                , isTopLevel = isTopLevel
+                , element = element
+                }
+
+        Help _ ->
+            fieldHtml
+                { locale = locale
+                , selectedNode = selected
+                , nodeClass = "help-element"
+                , isTopLevel = isTopLevel
+                , element = element
+                }
+
+        Blank _ ->
+            placeholderHtml element
+
+
+fieldHtml :
+    { locale : Locale
+    , selectedNode : Maybe Element
+    , nodeClass : String
+    , isTopLevel : Bool
+    , element : Element
+    }
+    -> Html Msg
+fieldHtml { selectedNode, nodeClass, isTopLevel, element, locale } =
+    div
+        (class "element"
+            :: class nodeClass
+            :: identifier element
+            :: dragAttributes
+                { isTopLevel = isTopLevel
+                , selected = selectedNode
+                , draggable = element
+                , container = element
+                }
+        )
+        [ div
+            [ class "field"
+            , class (Element.elementType element)
+            ]
+            [ dragHandle element
+            , div
+                [ class "field-content"
+                , stopPropagationOn "click"
+                    (Decode.succeed ( ElementSelected element, True ))
+                ]
+                [ elementIcon element
+                , h3 [] [ text (Element.label locale element) ]
+                ]
+            ]
+        ]
+
+
+groupHtmlContent :
+    Locale
+    -> Maybe Element
+    -> Element
+    -> { a | inline : Bool, elements : List Element, isOpen : Bool }
+    -> List (Html Msg)
+groupHtmlContent locale selected element { inline, elements, isOpen } =
+    [ dragHandle element
+    , div
+        [ class "group-content"
+        , stopPropagationOn "click"
+            (Decode.succeed ( ElementSelected element, True ))
+        ]
+        [ h3 [ class "group-name" ]
+            [ button
+                [ class "button-clear"
+                , onClick (OpenToggled (Element.id element))
+                ]
+                [ if isOpen then
+                    icon "gg-chevron-down"
+
+                  else
+                    icon "gg-chevron-right"
+                ]
+            , text (Element.label locale element)
+            ]
+        , div
+            [ class "group-fields"
+            , classList [ ( "inline", inline ), ( "stacked", not inline ) ]
+            ]
+            (if isOpen then
+                List.map (elementToHtml locale False selected) elements
+
+             else
+                []
+            )
+        ]
+    ]
+
+
+placeholderHtml : Element -> Html Msg
+placeholderHtml element =
+    div
+        (class "element placeholder-element"
+            :: (customOn "drop" <|
+                    Decode.succeed (DroppedOver (Element.id element))
+               )
+            :: dragAttributes
+                { isTopLevel = False
+                , selected = Nothing
+                , draggable = element
+                , container = element
+                }
+        )
+        [ div [ class "placeholder" ] [ text "" ] ]
+
+
+dragAttributes :
+    { isTopLevel : Bool
+    , selected : Maybe Element
+    , draggable : Element
+    , container : Element
+    }
+    -> List (Attribute Msg)
+dragAttributes { isTopLevel, selected, draggable, container } =
+    let
+        draggableId =
+            Element.id draggable
+
+        containerId =
+            Element.id container
+
+        selectionClass =
+            if Maybe.map Element.id selected == Just draggableId then
+                class "element-selected"
+
+            else
+                class ""
+    in
+    case Element.drag draggable of
+        Drag.Idle ->
+            [ customOn "dragover"
+                (Decode.map (DraggedOver isTopLevel containerId)
+                    Drag.positionDecoder
+                )
+            , customOn "dragenter"
+                (Decode.map (DraggedOver isTopLevel containerId)
+                    Drag.positionDecoder
+                )
+            , on "dragend" (Decode.succeed DragEnded)
+            , class "drag-idle"
+            , selectionClass
+            ]
+
+        Drag.Enabled ->
+            [ Attributes.draggable "true"
+            , on "dragstart" <| Decode.succeed (DragStarted (Move draggable))
+            , on "dragend" (Decode.succeed DragEnded)
+            , class "drag-enabled"
+            , selectionClass
+            ]
+
+        Drag.Dragged ->
+            [ Attributes.draggable "true"
+            , on "dragend" (Decode.succeed DragEnded)
+            , class "drag-dragged"
+            ]
+
+
+dragHandle : Element -> Html Msg
+dragHandle element =
+    div
+        (class "drag-handle"
+            :: (if Element.drag element == Drag.idle then
+                    [ onMouseDown (DragEnabled (Element.id element)) ]
+
+                else
+                    []
+               )
+        )
+        [ icon "gg-layout-grid-small" ]
+
+
+elementIcon : Element -> Html Msg
+elementIcon element =
+    div
+        [ class "field-icon"
+        , class (Element.elementType element)
+        ]
+        [ icon (Element.icon element) ]
+
+
+identifier : Element -> Attribute Msg
+identifier element =
+    Element.identifier element
+        |> Maybe.map Attributes.id
+        |> Maybe.withDefault (class "")
+
+
+icon : String -> Html Msg
+icon iconClass =
+    i [ class iconClass ] []
+
+
+customOn : String -> Decoder Msg -> Attribute Msg
+customOn event decoder =
+    Events.custom event <|
+        Decode.map
+            (\msg ->
+                { message = msg
+                , stopPropagation = True
+                , preventDefault = True
+                }
+            )
+            decoder
+
+
+idToString : Id -> String
+idToString elementId =
+    Id.toIdentifier Nothing elementId
+        |> Maybe.withDefault "unset"
