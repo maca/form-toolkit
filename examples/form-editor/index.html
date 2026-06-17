@@ -438,13 +438,23 @@
     #elm {
       height: 100vh;
       display: flex;
+      flex-direction: column;
     }
 
-    .schema-editor-container {
-      flex: 1;
+    .editor-layout {
       display: flex;
       flex-direction: column;
       height: 100%;
+      flex: 1;
+    }
+
+    .schema-editor-container {
+      flex: 0 0 55%;
+      display: flex;
+      flex-direction: column;
+      height: 55vh;
+      overflow: hidden;
+      border-bottom: 1px solid #ddd;
     }
 
     .schema-editor {
@@ -484,6 +494,7 @@
       padding: 1rem;
       overflow-y: auto;
       border-left: 1px solid #ddd;
+      text-align: left;
     }
 
     .schema-editor .editor-add {
@@ -539,7 +550,7 @@
       box-shadow: 0px 0px 0px 3px rgba(155,77,202,1) inset;
     }
 
-    .schema-editor .placeholder, .drag-dragged > * {
+    .schema-editor-tree .placeholder, .drag-dragged > * {
       height: 40px;
       border: 3px dashed rgba(0, 0, 0, 0.1);
     }
@@ -683,6 +694,234 @@
       display: flex;
       flex-direction: column;
       padding-left: 2rem;
+    }
+
+    /* FormToolkit field styling - vertically stacked */
+    .side-pane {
+      width: 100%;
+    }
+    .side-pane .field {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1.5rem;
+      width: 100%;
+      align-items: stretch;
+    }
+    .side-pane .field label,
+    .side-pane .field legend {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #606c76;
+      text-align: left;
+    }
+    .side-pane .field p {
+      text-align: left;
+    }
+    .side-pane .field .input-wrapper {
+      width: 100%;
+    }
+    .side-pane .field input,
+    .side-pane .field select,
+    .side-pane .field textarea {
+      margin-bottom: 0.5rem;
+      width: 100%;
+    }
+    .side-pane .field input[type='color'],
+    .side-pane .field input[type='date'],
+    .side-pane .field input[type='datetime'],
+    .side-pane .field input[type='datetime-local'],
+    .side-pane .field input[type='email'],
+    .side-pane .field input[type='month'],
+    .side-pane .field input[type='number'],
+    .side-pane .field input[type='password'],
+    .side-pane .field input[type='search'],
+    .side-pane .field input[type='tel'],
+    .side-pane .field input[type='text'],
+    .side-pane .field input[type='url'],
+    .side-pane .field input[type='week'],
+    .side-pane .field input:not([type]),
+    .side-pane .field textarea,
+    .side-pane .field select {
+      -webkit-appearance: none;
+      background-color: transparent;
+      border: 0.1rem solid #d1d1d1;
+      border-radius: .4rem;
+      box-shadow: none;
+      box-sizing: border-box;
+      height: 3.8rem;
+      padding: .6rem 1.0rem .7rem;
+      width: 100%;
+      font-size: 1.6rem;
+      font-family: inherit;
+    }
+    .side-pane .field input[type='color']:focus,
+    .side-pane .field input[type='date']:focus,
+    .side-pane .field input[type='datetime']:focus,
+    .side-pane .field input[type='datetime-local']:focus,
+    .side-pane .field input[type='email']:focus,
+    .side-pane .field input[type='month']:focus,
+    .side-pane .field input[type='number']:focus,
+    .side-pane .field input[type='password']:focus,
+    .side-pane .field input[type='search']:focus,
+    .side-pane .field input[type='tel']:focus,
+    .side-pane .field input[type='text']:focus,
+    .side-pane .field input[type='url']:focus,
+    .side-pane .field input[type='week']:focus,
+    .side-pane .field input:not([type]):focus,
+    .side-pane .field textarea:focus,
+    .side-pane .field select:focus {
+      border-color: #9b4dca;
+      outline: 0;
+    }
+    .side-pane .field select {
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 8" width="30"><path fill="%23d1d1d1" d="M0,0l6,8l6-8"/></svg>') center right no-repeat;
+      padding-right: 3.0rem;
+    }
+    .side-pane .field select:focus {
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 8" width="30"><path fill="%239b4dca" d="M0,0l6,8l6-8"/></svg>');
+    }
+    .side-pane .field textarea {
+      height: auto;
+      min-height: 6rem;
+      resize: vertical;
+    }
+    .side-pane .field input[type='checkbox'],
+    .side-pane .field input[type='radio'] {
+      display: inline;
+      height: auto;
+      width: auto;
+      margin-right: 0.5rem;
+    }
+    .side-pane .field input[type='checkbox'] + label,
+    .side-pane .field input[type='radio'] + label {
+      display: inline;
+      font-weight: normal;
+      margin-left: 0;
+      margin-bottom: 0;
+    }
+    .side-pane .field .label-inline {
+      display: inline;
+      font-weight: normal;
+      margin-left: 0;
+    }
+    .side-pane .inline-fields {
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      margin-bottom: 0;
+      width: 100%;
+    }
+    .side-pane .inline-fields > .field {
+      display: block;
+      flex: 1 1 auto;
+      margin-bottom: 1.5rem;
+    }
+    @media (min-width: 40rem) {
+      .side-pane .inline-fields {
+        flex-direction: row;
+        margin-left: -1.0rem;
+        width: calc(100% + 2.0rem);
+      }
+      .side-pane .inline-fields > .field {
+        margin-bottom: inherit;
+        padding: 0 1.0rem;
+      }
+    }
+    .side-pane fieldset,
+    .side-pane legend {
+      border-width: 0;
+      padding: 0;
+      margin: 0;
+      display: block;
+      text-align: left;
+    }
+    .side-pane fieldset {
+      margin-top: 1rem;
+    }
+    .side-pane .field:not(.required) label::after {
+      content: " (optional)";
+      color: rgba(96, 108, 118, 0.5);
+      font-weight: normal;
+    }
+    .side-pane .field p.errors {
+      margin: 0.5rem 0 0 0;
+      color: #af3b3b;
+      font-size: 1.3rem;
+      order: 3;
+    }
+    .side-pane .field p {
+      margin: 0.25rem 0 0 0;
+      color: #888;
+      font-size: 1.3rem;
+      order: 3;
+    }
+    .side-pane .field.with-errors input[type='color'],
+    .side-pane .field.with-errors input[type='date'],
+    .side-pane .field.with-errors input[type='datetime'],
+    .side-pane .field.with-errors input[type='datetime-local'],
+    .side-pane .field.with-errors input[type='email'],
+    .side-pane .field.with-errors input[type='month'],
+    .side-pane .field.with-errors input[type='number'],
+    .side-pane .field.with-errors input[type='password'],
+    .side-pane .field.with-errors input[type='search'],
+    .side-pane .field.with-errors input[type='tel'],
+    .side-pane .field.with-errors input[type='text'],
+    .side-pane .field.with-errors input[type='url'],
+    .side-pane .field.with-errors input[type='week'],
+    .side-pane .field.with-errors input:not([type]),
+    .side-pane .field.with-errors textarea,
+    .side-pane .field.with-errors select {
+      border-color: #af3b3b;
+    }
+
+    .editor-preview-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #f9f9f9;
+      border-top: 1px solid #ddd;
+    }
+
+    .editor-preview-pane .tab-nav {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      background: #fff;
+      padding: 0 1rem;
+    }
+
+    .editor-preview-pane .tab-button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #555;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      margin-right: 1rem;
+    }
+
+    .editor-preview-pane .tab-button:hover {
+      background: transparent;
+      color: #333;
+    }
+
+    .editor-preview-pane .tab-button.active {
+      color: #0066cc;
+      border-bottom-color: #0066cc;
+    }
+
+    .editor-preview-pane .tab-content {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+    }
+
+    .editor-preview-pane .tab-pane {
+      height: 100%;
     }
   </style>
 </head>

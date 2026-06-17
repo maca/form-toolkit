@@ -1,6 +1,5 @@
 module EditorForm exposing (EditorForm, Msg, init, update, view)
 
-import Dict exposing (Dict)
 import Editor.Element as Element exposing (Element(..), Field(..))
 import FormToolkit.Field as FormField exposing (Field)
 import FormToolkit.Parse as Parse
@@ -122,18 +121,18 @@ textFieldForm params =
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (getLocaleValue params.label)
+            , FormField.value (Value.string params.label)
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (getLocaleValue params.placeholder)
+            , FormField.value (Value.string params.placeholder)
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (getLocaleValue params.hint)
+            , FormField.value (Value.string params.hint)
             ]
         , FormField.checkbox
             [ FormField.identifier RequiredId
@@ -143,7 +142,7 @@ textFieldForm params =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (getLocaleValue params.help)
+            , FormField.value (Value.string params.help)
             ]
         ]
 
@@ -161,23 +160,23 @@ checkboxFieldForm params =
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (getLocaleValue params.label)
+            , FormField.value (Value.string params.label)
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (getLocaleValue params.placeholder)
+            , FormField.value (Value.string params.placeholder)
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (getLocaleValue params.hint)
+            , FormField.value (Value.string params.hint)
             ]
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (getLocaleValue params.help)
+            , FormField.value (Value.string params.help)
             ]
         ]
 
@@ -195,18 +194,18 @@ rangeFieldForm params minField maxField =
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (getLocaleValue params.label)
+            , FormField.value (Value.string params.label)
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (getLocaleValue params.placeholder)
+            , FormField.value (Value.string params.placeholder)
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (getLocaleValue params.hint)
+            , FormField.value (Value.string params.hint)
             ]
         , FormField.group []
             [ minField, maxField ]
@@ -218,12 +217,12 @@ rangeFieldForm params minField maxField =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (getLocaleValue params.help)
+            , FormField.value (Value.string params.help)
             ]
         ]
 
 
-optionsFieldForm : Element.FieldParams -> List ( String, Dict String String ) -> Field FieldId
+optionsFieldForm : Element.FieldParams -> List ( String, String ) -> Field FieldId
 optionsFieldForm params options =
     FormField.group []
         [ FormField.text
@@ -236,18 +235,18 @@ optionsFieldForm params options =
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (getLocaleValue params.label)
+            , FormField.value (Value.string params.label)
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (getLocaleValue params.placeholder)
+            , FormField.value (Value.string params.placeholder)
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (getLocaleValue params.hint)
+            , FormField.value (Value.string params.hint)
             ]
         , FormField.checkbox
             [ FormField.identifier RequiredId
@@ -263,7 +262,7 @@ optionsFieldForm params options =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (getLocaleValue params.help)
+            , FormField.value (Value.string params.help)
             ]
         ]
 
@@ -284,15 +283,15 @@ optionTemplate =
         ]
 
 
-optionInitializer : ( String, Dict String String ) -> (Field FieldId -> Field FieldId)
-optionInitializer ( optionValue, labels ) =
+optionInitializer : ( String, String ) -> (Field FieldId -> Field FieldId)
+optionInitializer ( optionValue, label_ ) =
     \template ->
         template
             |> FormField.updateWithId OptionValueId (FormField.value (Value.string optionValue))
-            |> FormField.updateWithId OptionLabelId (FormField.value (getLocaleValueFromDict labels))
+            |> FormField.updateWithId OptionLabelId (FormField.value (Value.string label_))
 
 
-fromGroupElement : { a | name : String, label : Dict String String, inline : Bool } -> Field FieldId
+fromGroupElement : { a | name : String, label : String, inline : Bool } -> Field FieldId
 fromGroupElement params =
     FormField.group []
         [ FormField.text
@@ -305,7 +304,7 @@ fromGroupElement params =
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (getLocaleValue params.label)
+            , FormField.value (Value.string params.label)
             ]
         , FormField.select
             [ FormField.identifier InlineId
@@ -320,7 +319,7 @@ fromGroupElement params =
         ]
 
 
-fromRepeatableGroupElement : { a | name : String, label : Dict String String, inline : Bool } -> Field FieldId
+fromRepeatableGroupElement : { a | name : String, label : String, inline : Bool } -> Field FieldId
 fromRepeatableGroupElement params =
     FormField.group []
         [ FormField.text
@@ -333,7 +332,7 @@ fromRepeatableGroupElement params =
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (getLocaleValue params.label)
+            , FormField.value (Value.string params.label)
             ]
         , FormField.select
             [ FormField.identifier InlineId
@@ -348,7 +347,7 @@ fromRepeatableGroupElement params =
         ]
 
 
-reviewForm : { a | name : String, text : Dict String String } -> Field FieldId
+reviewForm : { a | name : String, text : String } -> Field FieldId
 reviewForm params =
     FormField.group []
         [ FormField.text
@@ -360,13 +359,13 @@ reviewForm params =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Text"
-            , FormField.value (getLocaleValue params.text)
+            , FormField.value (Value.string params.text)
             , FormField.required True
             ]
         ]
 
 
-helpForm : { a | name : String, button : Dict String String, text : Dict String String } -> Field FieldId
+helpForm : { a | name : String, button : String, text : String } -> Field FieldId
 helpForm params =
     FormField.group []
         [ FormField.text
@@ -378,13 +377,13 @@ helpForm params =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Text"
-            , FormField.value (getLocaleValue params.text)
+            , FormField.value (Value.string params.text)
             , FormField.required True
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Button Text"
-            , FormField.value (getLocaleValue params.button)
+            , FormField.value (Value.string params.button)
             , FormField.required True
             ]
         ]
@@ -397,10 +396,10 @@ parseElement element field =
             FieldElement
                 { params
                     | name = getStringValue NameId field params.name
-                    , label = setLocaleValue LabelId field params.label
-                    , placeholder = setLocaleValue PlaceholderId field params.placeholder
-                    , hint = setLocaleValue HintId field params.hint
-                    , help = setLocaleValue HelpId field params.help
+                    , label = getStringValue LabelId field params.label
+                    , placeholder = getStringValue PlaceholderId field params.placeholder
+                    , hint = getStringValue HintId field params.hint
+                    , help = getStringValue HelpId field params.help
                     , isRequired = getBoolValue RequiredId field params.isRequired
                     , field = parseFieldType params.field field
                 }
@@ -409,7 +408,7 @@ parseElement element field =
             ElementGroup
                 { params
                     | name = getStringValue NameId field params.name
-                    , label = setLocaleValue LabelId field params.label
+                    , label = getStringValue LabelId field params.label
                     , inline = getBoolValue InlineId field params.inline
                 }
 
@@ -417,7 +416,7 @@ parseElement element field =
             RepeatableGroup
                 { params
                     | name = getStringValue NameId field params.name
-                    , label = setLocaleValue LabelId field params.label
+                    , label = getStringValue LabelId field params.label
                     , inline = getBoolValue InlineId field params.inline
                 }
 
@@ -425,15 +424,15 @@ parseElement element field =
             Review
                 { params
                     | name = getStringValue NameId field params.name
-                    , text = setLocaleValue HelpId field params.text
+                    , text = getStringValue HelpId field params.text
                 }
 
         Help params ->
             Help
                 { params
                     | name = getStringValue NameId field params.name
-                    , text = setLocaleValue HelpId field params.text
-                    , button = setLocaleValue LabelId field params.button
+                    , text = getStringValue HelpId field params.text
+                    , button = getStringValue LabelId field params.button
                 }
 
         _ ->
@@ -495,45 +494,16 @@ getValueByIdWithDefault id field default =
         |> Maybe.withDefault default
 
 
-getLocaleValue : Dict String String -> Value
-getLocaleValue dict =
-    Dict.values dict
-        |> List.head
-        |> Maybe.map Value.string
-        |> Maybe.withDefault Value.blank
-
-
-getLocaleValueFromDict : Dict String String -> Value
-getLocaleValueFromDict dict =
-    getLocaleValue dict
-
-
-setLocaleValue : FieldId -> Field FieldId -> Dict String String -> Dict String String
-setLocaleValue id field dict =
-    case Parse.parse (Parse.field id (Parse.maybe Parse.string)) field of
-        Ok (Just str) ->
-            Dict.values dict
-                |> List.head
-                |> Maybe.map (\locale -> Dict.singleton locale str)
-                |> Maybe.withDefault dict
-
-        Ok Nothing ->
-            dict
-
-        Err _ ->
-            dict
-
-
-parseOptions : Field FieldId -> List ( String, Dict String String )
+parseOptions : Field FieldId -> List ( String, String )
 parseOptions field =
     Parse.parse
-        (Parse.field OptionsId (Parse.list (optionParser "")))
+        (Parse.field OptionsId (Parse.list optionParser))
         field
         |> Result.withDefault []
 
 
-optionParser : String -> Parse.Parser FieldId ( String, Dict String String )
-optionParser locale =
-    Parse.map2 (\v l -> ( v, Dict.singleton locale l ))
+optionParser : Parse.Parser FieldId ( String, String )
+optionParser =
+    Parse.map2 (\v l -> ( v, l ))
         (Parse.field OptionValueId (Parse.maybe Parse.string |> Parse.map (Maybe.withDefault "")))
         (Parse.field OptionLabelId (Parse.maybe Parse.string |> Parse.map (Maybe.withDefault "")))

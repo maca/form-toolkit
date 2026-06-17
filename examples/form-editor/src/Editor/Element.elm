@@ -41,13 +41,11 @@ module Editor.Element exposing
     )
 
 import Basics.Extra exposing (flip)
-import Dict exposing (Dict)
 import Editor.Drag as Drag exposing (Drag, Position(..))
 import Editor.Id as Id exposing (Id)
 import FormToolkit.Value as Value exposing (Value)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
-import Locale exposing (Locale)
 import Schema exposing (GroupParams)
 import String.Extra as String
 
@@ -63,15 +61,15 @@ type Field
 
 
 type alias Options =
-    List ( String, Dict String String )
+    List ( String, String )
 
 
 type alias FieldParams =
     { name : String
-    , label : Dict String String
-    , placeholder : Dict String String
-    , hint : Dict String String
-    , help : Dict String String
+    , label : String
+    , placeholder : String
+    , hint : String
+    , help : String
     , isRequired : Bool
     , field : Field
     , id : Id
@@ -83,20 +81,20 @@ type Element
     = FieldElement FieldParams
     | Review
         { name : String
-        , text : Dict String String
+        , text : String
         , id : Id
         , drag : Drag
         }
     | Help
         { name : String
-        , button : Dict String String
-        , text : Dict String String
+        , button : String
+        , text : String
         , id : Id
         , drag : Drag
         }
     | RepeatableGroup
         { name : String
-        , label : Dict String String
+        , label : String
         , inline : Bool
         , elements : List Element
         , id : Id
@@ -105,7 +103,7 @@ type Element
         }
     | ElementGroup
         { name : String
-        , label : Dict String String
+        , label : String
         , inline : Bool
         , elements : List Element
         , id : Id
@@ -155,7 +153,7 @@ group =
     ElementGroup
         { id = Id.unset
         , name = ""
-        , label = Dict.empty
+        , label = ""
         , inline = False
         , elements = []
         , isOpen = False
@@ -168,7 +166,7 @@ repeatableGroup =
     RepeatableGroup
         { id = Id.unset
         , name = ""
-        , label = Dict.empty
+        , label = ""
         , inline = False
         , elements = []
         , drag = Drag.idle
@@ -181,7 +179,7 @@ review =
     Review
         { id = Id.unset
         , name = ""
-        , text = Dict.empty
+        , text = ""
         , drag = Drag.idle
         }
 
@@ -191,8 +189,8 @@ help =
     Help
         { id = Id.unset
         , name = ""
-        , button = Dict.empty
-        , text = Dict.empty
+        , button = ""
+        , text = ""
         , drag = Drag.idle
         }
 
@@ -202,7 +200,7 @@ root children =
     ElementGroup
         { id = Id.unset
         , name = "root"
-        , label = Dict.empty
+        , label = ""
         , inline = False
         , elements = children
         , drag = Drag.idle
@@ -300,21 +298,29 @@ name element =
             ""
 
 
-label : Locale -> Element -> String
-label locale element =
+label : Element -> String
+label element =
     case element of
         ElementGroup params ->
-            Dict.get locale params.label
-                |> Maybe.withDefault "Group"
+            if String.isEmpty params.label then
+                "Group"
+
+            else
+                params.label
 
         RepeatableGroup params ->
-            Dict.get locale params.label
-                |> Maybe.withDefault "Repeatable"
+            if String.isEmpty params.label then
+                "Repeatable"
+
+            else
+                params.label
 
         FieldElement params ->
-            Dict.get locale params.label
-                |> Maybe.withDefault
-                    (String.toSentenceCase (elementType element))
+            if String.isEmpty params.label then
+                String.toSentenceCase (elementType element)
+
+            else
+                params.label
 
         Review params ->
             if String.isEmpty params.name then
@@ -324,8 +330,11 @@ label locale element =
                 params.name
 
         Help params ->
-            Dict.get locale params.button
-                |> Maybe.withDefault "Help"
+            if String.isEmpty params.button then
+                "Help"
+
+            else
+                params.button
 
         Blank _ ->
             ""
@@ -543,33 +552,8 @@ isPlaceholder element =
 
 
 decode : Element -> Encode.Value -> Result Decode.Error Element
-decode element =
-    Decode.decodeValue
-        (Decode.map (open True) <|
-            case element of
-                ElementGroup params ->
-                    Decode.map2 makeGroup
-                        Schema.groupParamsDecoder
-                        (Decode.succeed params.elements)
-
-                RepeatableGroup params ->
-                    Decode.map
-                        (\p ->
-                            RepeatableGroup
-                                { id = Id.unset
-                                , name = p.name
-                                , label = p.label
-                                , inline = p.inline
-                                , elements = params.elements
-                                , drag = Drag.idle
-                                , isOpen = True
-                                }
-                        )
-                        Schema.groupParamsDecoder
-
-                _ ->
-                    decoder
-        )
+decode element _ =
+    Ok (open True element)
 
 
 decoder : Decoder Element
@@ -589,7 +573,7 @@ encode element =
                 [ ( "type", Encode.string (elementType element) )
                 , ( "inline", Encode.bool attrs.inline )
                 , ( "name", Encode.string attrs.name )
-                , ( "label", encodeCopies attrs.label )
+                , ( "label", Encode.string attrs.label )
                 , ( "fields"
                   , Encode.list identity (List.filterMap encode attrs.elements)
                   )
@@ -600,7 +584,7 @@ encode element =
                 [ ( "type", Encode.string (elementType element) )
                 , ( "inline", Encode.bool attrs.inline )
                 , ( "name", Encode.string attrs.name )
-                , ( "label", encodeCopies attrs.label )
+                , ( "label", Encode.string attrs.label )
                 , ( "fields"
                   , Encode.list identity (List.filterMap encode attrs.elements)
                   )
@@ -611,10 +595,10 @@ encode element =
                 attributesValues =
                     [ ( "type", Encode.string (elementType element) )
                     , ( "name", Encode.string attrs.name )
-                    , ( "label", encodeCopies attrs.label )
-                    , ( "placeholder", encodeCopies attrs.placeholder )
-                    , ( "help", encodeCopies attrs.help )
-                    , ( "hint", encodeCopies attrs.help )
+                    , ( "label", Encode.string attrs.label )
+                    , ( "placeholder", Encode.string attrs.placeholder )
+                    , ( "help", Encode.string attrs.help )
+                    , ( "hint", Encode.string attrs.help )
                     , ( "required", Encode.bool attrs.isRequired )
                     ]
             in
@@ -657,15 +641,15 @@ encode element =
             maybeValue
                 [ ( "type", Encode.string (elementType element) )
                 , ( "name", Encode.string attrs.name )
-                , ( "text", encodeCopies attrs.text )
+                , ( "text", Encode.string attrs.text )
                 ]
 
         Help attrs ->
             maybeValue
                 [ ( "type", Encode.string (elementType element) )
                 , ( "name", Encode.string attrs.name )
-                , ( "button", encodeCopies attrs.button )
-                , ( "text", encodeCopies attrs.text )
+                , ( "button", Encode.string attrs.button )
+                , ( "text", Encode.string attrs.text )
                 ]
 
         Blank _ ->
@@ -675,34 +659,16 @@ encode element =
 encodeOptions : Options -> Encode.Value
 encodeOptions =
     Encode.list
-        (\( val, labels ) ->
+        (\( val, label_ ) ->
             Encode.object
                 [ ( "value", Encode.string val )
-                , ( "label", Encode.dict identity Encode.string labels )
+                , ( "label", Encode.string label_ )
                 ]
         )
 
 
-encodeCopies : Dict String String -> Encode.Value
-encodeCopies =
-    Encode.dict identity Encode.string
-
-
 
 -- HELPERS
-
-
-makeGroup : GroupParams -> List Element -> Element
-makeGroup params children =
-    ElementGroup
-        { id = Id.unset
-        , name = params.name
-        , label = params.label
-        , inline = params.inline
-        , elements = children
-        , drag = Drag.idle
-        , isOpen = True
-        }
 
 
 makeField : Field -> Element
@@ -712,10 +678,10 @@ makeField field =
         , field = field
         , name = ""
         , isRequired = False
-        , label = Dict.empty
-        , placeholder = Dict.empty
-        , hint = Dict.empty
-        , help = Dict.empty
+        , label = ""
+        , placeholder = ""
+        , hint = ""
+        , help = ""
         , drag = Drag.idle
         }
 

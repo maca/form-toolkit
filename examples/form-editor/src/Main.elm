@@ -1,7 +1,6 @@
 module Main exposing (main)
 
 import Browser
-import Dict
 import Editor.Drag as Drag exposing (Drag(..), Position(..))
 import Editor.Element as Element exposing (Element(..))
 import Editor.Id as Id exposing (Id)
@@ -36,7 +35,6 @@ import Html.Events as Events
         , stopPropagationOn
         )
 import Json.Decode as Decode exposing (Decoder)
-import Locale exposing (Locale)
 
 
 main : Program () Model Msg
@@ -53,9 +51,14 @@ type alias Model =
     , nextNode : Id
     , selected : Maybe Element
     , dragAction : DragAction
-    , locale : Locale
     , editForm : EditorForm.EditorForm
+    , activeTab : Tab
     }
+
+
+type Tab
+    = PreviewTab
+    | JsonTab
 
 
 type DragAction
@@ -74,6 +77,7 @@ type Msg
     | DragEnded
     | ElementRemoved Id
     | FormMsg EditorForm.Msg
+    | TabSwitched Tab
 
 
 init : Model
@@ -85,7 +89,7 @@ init =
                     [ ElementGroup
                         { id = Id.unset
                         , name = "fields"
-                        , label = Dict.empty
+                        , label = ""
                         , inline = False
                         , elements =
                             [ FieldElement
@@ -93,10 +97,10 @@ init =
                                 , field = Element.TextField
                                 , name = "text_field"
                                 , isRequired = False
-                                , label = Dict.empty
-                                , placeholder = Dict.empty
-                                , hint = Dict.empty
-                                , help = Dict.empty
+                                , label = ""
+                                , placeholder = ""
+                                , hint = ""
+                                , help = ""
                                 , drag = Drag.idle
                                 }
                             ]
@@ -110,8 +114,8 @@ init =
     , nextNode = nextId
     , selected = Nothing
     , dragAction = None
-    , locale = ""
     , editForm = EditorForm.init (Element.root [])
+    , activeTab = PreviewTab
     }
 
 
@@ -190,10 +194,14 @@ update msg model =
                     { model
                         | editForm = newForm
                         , element = updateElementInTree updatedElement model.element
+                        , selected = Just updatedElement
                     }
 
                 Nothing ->
                     { model | editForm = newForm }
+
+        TabSwitched tab ->
+            { model | activeTab = tab }
 
 
 updateElementInTree : Element -> Element -> Element
@@ -349,35 +357,69 @@ remove elementId =
 
 view : Model -> Html Msg
 view model =
-    div [ class "schema-editor-container" ]
-        [ div [ class "schema-editor" ]
-            [ section [ class "schema-editor-panes" ]
-                [ div [ class "schema-editor-palete" ]
-                    [ addFieldHtml False Element.text
-                    , addFieldHtml False Element.checkbox
-                    , addFieldHtml False Element.integer
-                    , addFieldHtml False Element.date
-                    , addFieldHtml False Element.month
-                    , addFieldHtml False (Element.select [])
-                    , addFieldHtml False (Element.radio [])
-                    , addElementHtml False "repeatable-group" Element.repeatableGroup
-                    , addElementHtml False "group-addition" Element.group
-                    ]
-                , div [ class "schema-editor-tree" ]
-                    (if Element.isEmptyGroup model.element then
-                        [ placeholderHtml model.element ]
+    div [ class "editor-layout" ]
+        [ div [ class "schema-editor-container" ]
+            [ div [ class "schema-editor" ]
+                [ section [ class "schema-editor-panes" ]
+                    [ div [ class "schema-editor-palete" ]
+                        [ addFieldHtml False Element.text
+                        , addFieldHtml False Element.checkbox
+                        , addFieldHtml False Element.integer
+                        , addFieldHtml False Element.date
+                        , addFieldHtml False Element.month
+                        , addFieldHtml False (Element.select [])
+                        , addFieldHtml False (Element.radio [])
+                        , addElementHtml False "repeatable-group" Element.repeatableGroup
+                        , addElementHtml False "group-addition" Element.group
+                        ]
+                    , div [ class "schema-editor-tree" ]
+                        (if Element.isEmptyGroup model.element then
+                            [ placeholderHtml model.element ]
 
-                     else
-                        let
-                            selected =
-                                model.selected
-                        in
-                        model.element
-                            |> Element.elements
-                            |> List.map (elementToHtml model.locale True selected)
-                    )
-                , sidePane model.selected model.editForm
+                         else
+                            let
+                                selected =
+                                    model.selected
+                            in
+                            model.element
+                                |> Element.elements
+                                |> List.map (elementToHtml True selected)
+                        )
+                    , sidePane model.selected model.editForm
+                    ]
                 ]
+            ]
+        , div [ class "editor-preview-pane" ]
+            [ div [ class "tab-nav" ]
+                [ button
+                    [ classList
+                        [ ( "tab-button", True )
+                        , ( "active", model.activeTab == PreviewTab )
+                        ]
+                    , onClick (TabSwitched PreviewTab)
+                    ]
+                    [ text "Preview" ]
+                , button
+                    [ classList
+                        [ ( "tab-button", True )
+                        , ( "active", model.activeTab == JsonTab )
+                        ]
+                    , onClick (TabSwitched JsonTab)
+                    ]
+                    [ text "JSON" ]
+                ]
+            , div [ class "tab-content" ]
+                (case model.activeTab of
+                    PreviewTab ->
+                        [ div [ class "tab-pane" ]
+                            [ text "Preview content coming soon" ]
+                        ]
+
+                    JsonTab ->
+                        [ div [ class "tab-pane" ]
+                            [ text "JSON content coming soon" ]
+                        ]
+                )
             ]
         ]
 
@@ -389,7 +431,6 @@ sidePane selected editForm =
             aside [ class "side-pane" ]
                 [ h3 [] [ text "Edit Element" ]
                 , Html.map FormMsg (EditorForm.view editForm)
-                , div [] [ text ("ID: " ++ idToString (Element.id element)) ]
                 , button [ onClick (ElementRemoved (Element.id element)), class "button" ]
                     [ text "Remove Element" ]
                 ]
@@ -421,12 +462,12 @@ addElementHtml disabled class_ element =
         )
         [ div [ class "drag-handle" ] [ icon "gg-layout-grid-small" ]
         , elementIcon element
-        , h3 [] [ text (Element.label "" element) ]
+        , h3 [] [ text (Element.label element) ]
         ]
 
 
-elementToHtml : Locale -> Bool -> Maybe Element -> Element -> Html Msg
-elementToHtml locale isTopLevel selected element =
+elementToHtml : Bool -> Maybe Element -> Element -> Html Msg
+elementToHtml isTopLevel selected element =
     case element of
         ElementGroup params ->
             div
@@ -440,7 +481,7 @@ elementToHtml locale isTopLevel selected element =
                         }
                 )
                 [ div [ class "group" ]
-                    (groupHtmlContent locale selected element params)
+                    (groupHtmlContent selected element params)
                 ]
 
         RepeatableGroup params ->
@@ -455,13 +496,12 @@ elementToHtml locale isTopLevel selected element =
                         }
                 )
                 [ div [ class "repeatable-group" ]
-                    (groupHtmlContent locale selected element params)
+                    (groupHtmlContent selected element params)
                 ]
 
         FieldElement _ ->
             fieldHtml
-                { locale = locale
-                , selectedNode = selected
+                { selectedNode = selected
                 , nodeClass = "field-element"
                 , isTopLevel = isTopLevel
                 , element = element
@@ -469,8 +509,7 @@ elementToHtml locale isTopLevel selected element =
 
         Review _ ->
             fieldHtml
-                { locale = locale
-                , selectedNode = selected
+                { selectedNode = selected
                 , nodeClass = "review-element"
                 , isTopLevel = isTopLevel
                 , element = element
@@ -478,8 +517,7 @@ elementToHtml locale isTopLevel selected element =
 
         Help _ ->
             fieldHtml
-                { locale = locale
-                , selectedNode = selected
+                { selectedNode = selected
                 , nodeClass = "help-element"
                 , isTopLevel = isTopLevel
                 , element = element
@@ -490,14 +528,13 @@ elementToHtml locale isTopLevel selected element =
 
 
 fieldHtml :
-    { locale : Locale
-    , selectedNode : Maybe Element
+    { selectedNode : Maybe Element
     , nodeClass : String
     , isTopLevel : Bool
     , element : Element
     }
     -> Html Msg
-fieldHtml { selectedNode, nodeClass, isTopLevel, element, locale } =
+fieldHtml { selectedNode, nodeClass, isTopLevel, element } =
     div
         (class "element"
             :: class nodeClass
@@ -520,19 +557,18 @@ fieldHtml { selectedNode, nodeClass, isTopLevel, element, locale } =
                     (Decode.succeed ( ElementSelected element, True ))
                 ]
                 [ elementIcon element
-                , h3 [] [ text (Element.label locale element) ]
+                , h3 [] [ text (Element.label element) ]
                 ]
             ]
         ]
 
 
 groupHtmlContent :
-    Locale
-    -> Maybe Element
+    Maybe Element
     -> Element
     -> { a | inline : Bool, elements : List Element, isOpen : Bool }
     -> List (Html Msg)
-groupHtmlContent locale selected element { inline, elements, isOpen } =
+groupHtmlContent selected element { inline, elements, isOpen } =
     [ dragHandle element
     , div
         [ class "group-content"
@@ -550,14 +586,14 @@ groupHtmlContent locale selected element { inline, elements, isOpen } =
                   else
                     icon "gg-chevron-right"
                 ]
-            , text (Element.label locale element)
+            , text (Element.label element)
             ]
         , div
             [ class "group-fields"
             , classList [ ( "inline", inline ), ( "stacked", not inline ) ]
             ]
             (if isOpen then
-                List.map (elementToHtml locale False selected) elements
+                List.map (elementToHtml False selected) elements
 
              else
                 []

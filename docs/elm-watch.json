@@ -1,12 +1,12 @@
 {
-    "targets": {
-        "My target name": {
-            "inputs": [
-                "src/Main.elm"
-            ],
-            "output": "static/main.js"
-        }
-    },
-    "serve": "./static/",
-    "port": 8001
+  "targets": {
+    "My target name": {
+      "inputs": [
+        "src/Main.elm"
+      ],
+      "output": "static/main.js"
+    }
+  },
+  "serve": "./static/",
+  "port": 9002
 }
