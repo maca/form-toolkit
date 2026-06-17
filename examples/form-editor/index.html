@@ -5,7 +5,424 @@
   <title>Form Editor - Drag & Drop Demo</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/milligram/dist/milligram.min.css">
   <style>
-    @import url("https://cdn.jsdelivr.net/npm/css.gg@2.9.0/css/all.css");
+    /* css.gg icons — hardcoded from https://css.gg */
+    .gg-chevron-right {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 22px;
+      height: 22px;
+      border: 2px solid transparent;
+      border-radius: 100px;
+    }
+    .gg-chevron-right::after {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-bottom: 2px solid;
+      border-right: 2px solid;
+      transform: rotate(-45deg);
+      right: 6px;
+      top: 4px;
+    }
+
+    .gg-chevron-down {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 22px;
+      height: 22px;
+      border: 2px solid transparent;
+      border-radius: 100px;
+    }
+    .gg-chevron-down::after {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-bottom: 2px solid;
+      border-right: 2px solid;
+      transform: rotate(45deg);
+      left: 4px;
+      top: 2px;
+    }
+
+    .gg-layout-grid-small {
+      transform: scale(var(--ggs, 1));
+    }
+    .gg-layout-grid-small,
+    .gg-layout-grid-small::after,
+    .gg-layout-grid-small::before {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      width: 10px;
+      height: 2px;
+      border-left: 6px double;
+      border-right: 2px solid;
+    }
+    .gg-layout-grid-small::after,
+    .gg-layout-grid-small::before {
+      content: "";
+      position: absolute;
+      left: -6px;
+    }
+    .gg-layout-grid-small::after {
+      bottom: 4px;
+    }
+    .gg-layout-grid-small::before {
+      top: 4px;
+    }
+
+    .gg-edit-flip-h {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      width: 18px;
+      height: 18px;
+      transform: scale(var(--ggs, 1));
+      background: linear-gradient(to left, currentColor 22px, transparent 0)
+        no-repeat center/2px 22px;
+    }
+    .gg-edit-flip-h::after,
+    .gg-edit-flip-h::before {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      width: 6px;
+      height: 14px;
+      border: 2px solid;
+      top: 2px;
+    }
+    .gg-edit-flip-h::before {
+      border-right: 0;
+      border-top-left-radius: 3px;
+      border-bottom-left-radius: 3px;
+    }
+    .gg-edit-flip-h::after {
+      opacity: 0.5;
+      border-left: 0;
+      border-top-right-radius: 3px;
+      border-bottom-right-radius: 3px;
+      right: 0;
+    }
+
+    .gg-hashtag {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 8px;
+      height: 16px;
+      border-left: 2px solid;
+      border-right: 2px solid;
+    }
+    .gg-hashtag::before {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      width: 16px;
+      height: 8px;
+      border-top: 2px solid;
+      border-bottom: 2px solid;
+      left: -6px;
+      top: 4px;
+    }
+
+    .gg-calendar-due {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 18px;
+      height: 18px;
+      border: 2px solid;
+      border-radius: 3px;
+    }
+    .gg-calendar-due::after,
+    .gg-calendar-due::before {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      border-radius: 6px;
+      background: currentColor;
+    }
+    .gg-calendar-due::before {
+      top: 2px;
+      width: 10px;
+      height: 2px;
+      left: 2px;
+    }
+    .gg-calendar-due::after {
+      width: 4px;
+      height: 4px;
+      bottom: 3px;
+      left: 5px;
+    }
+
+    .gg-calendar-dates {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 18px;
+      height: 18px;
+      border: 2px solid;
+      border-radius: 3px;
+    }
+    .gg-calendar-dates::after,
+    .gg-calendar-dates::before {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      border-radius: 3px;
+      height: 2px;
+      left: 2px;
+    }
+    .gg-calendar-dates::before {
+      background: currentColor;
+      width: 2px;
+      box-shadow: 4px 0 0, 8px 0 0, 0 4px 0, 4px 4px 0, 8px 4px 0;
+      top: 6px;
+    }
+    .gg-calendar-dates::after {
+      width: 10px;
+      top: -4px;
+      box-shadow: 0 6px 0 0;
+    }
+
+    .gg-format-separator {
+      transform: scale(var(--ggs, 1));
+    }
+    .gg-format-separator,
+    .gg-format-separator::after {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      width: 18px;
+      height: 2px;
+      border-radius: 3px;
+      background: currentColor;
+    }
+    .gg-format-separator::after {
+      content: "";
+      position: absolute;
+      top: -12px;
+      left: 3px;
+      opacity: 0.5;
+      width: 12px;
+      box-shadow: 0 4px 0 0, 0 8px 0 0, 0 16px 0 0;
+    }
+
+    .gg-radio-checked,
+    .gg-radio-checked::after {
+      display: block;
+      box-sizing: border-box;
+      border-radius: 100px;
+    }
+    .gg-radio-checked {
+      border: 2px solid;
+      position: relative;
+      transform: scale(var(--ggs, 1));
+      width: 20px;
+      height: 20px;
+    }
+    .gg-radio-checked::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: currentColor;
+      top: 4px;
+      left: 4px;
+    }
+
+    .gg-bulb {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 16px;
+      height: 16px;
+      border: 2px solid;
+      border-bottom-color: transparent;
+      border-radius: 100px;
+    }
+    .gg-bulb::after,
+    .gg-bulb::before {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+    }
+    .gg-bulb::before {
+      border-top: 0;
+      border-bottom-left-radius: 18px;
+      border-bottom-right-radius: 18px;
+      top: 10px;
+      border-bottom: 2px solid transparent;
+      box-shadow: 0 5px 0 -2px, inset 2px 0 0 0, inset -2px 0 0 0, inset 0 -4px 0 -2px;
+      width: 8px;
+      height: 8px;
+      left: 2px;
+    }
+    .gg-bulb::after {
+      width: 12px;
+      height: 2px;
+      border-left: 3px solid;
+      border-right: 3px solid;
+      border-radius: 2px;
+      bottom: 0;
+      left: 0;
+    }
+
+    .gg-extension-alt {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 14px;
+      height: 14px;
+    }
+    .gg-extension-alt::after,
+    .gg-extension-alt::before {
+      content: "";
+      display: block;
+      position: absolute;
+      box-sizing: border-box;
+      width: 8px;
+      height: 14px;
+      border: 2px solid;
+    }
+    .gg-extension-alt::after {
+      width: 14px;
+      height: 8px;
+    }
+
+    .gg-extension-add {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      background:
+        linear-gradient(to left, currentColor 10px, transparent 0) no-repeat 10px 2px/6px 2px,
+        linear-gradient(to left, currentColor 10px, transparent 0) no-repeat 12px 0/2px 6px;
+      width: 22px;
+      height: 22px;
+    }
+    .gg-extension-add::after,
+    .gg-extension-add::before {
+      content: "";
+      display: block;
+      position: absolute;
+      box-sizing: border-box;
+      width: 8px;
+      height: 14px;
+      border: 2px solid;
+      bottom: 0;
+    }
+    .gg-extension-add::after {
+      width: 14px;
+      height: 8px;
+    }
+
+    .gg-check-r {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      width: 22px;
+      height: 22px;
+      border: 2px solid;
+      transform: scale(var(--ggs, 1));
+      border-radius: 4px;
+    }
+    .gg-check-r::after {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      left: 3px;
+      top: -1px;
+      width: 6px;
+      height: 10px;
+      border-width: 0 2px 2px 0;
+      border-style: solid;
+      transform-origin: bottom left;
+      transform: rotate(45deg);
+    }
+
+    .gg-flag-alt {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 14px;
+      height: 20px;
+      border-left: 2px solid;
+    }
+    .gg-flag-alt::after,
+    .gg-flag-alt::before {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      border-bottom: 2px solid;
+    }
+    .gg-flag-alt::before {
+      width: 12px;
+      height: 10px;
+      border-top: 2px solid;
+      border-right: 2px solid transparent;
+    }
+    .gg-flag-alt::after {
+      width: 8px;
+      height: 8px;
+      border-left: 2px solid;
+      border-top-left-radius: 2px;
+      border-bottom-right-radius: 2px;
+      transform: rotate(45deg);
+      top: 1px;
+      left: 6px;
+    }
+
+    .gg-close {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      transform: scale(var(--ggs, 1));
+      width: 22px;
+      height: 22px;
+      border: 2px solid transparent;
+      border-radius: 40px;
+    }
+    .gg-close::after,
+    .gg-close::before {
+      content: "";
+      display: block;
+      box-sizing: border-box;
+      position: absolute;
+      width: 16px;
+      height: 2px;
+      background: currentColor;
+      transform: rotate(45deg);
+      border-radius: 5px;
+      top: 8px;
+      left: 1px;
+    }
+    .gg-close::after {
+      transform: rotate(-45deg);
+    }
 
     body {
       padding: 0;
@@ -74,6 +491,8 @@
       margin-bottom: var(--element-spacing);
       border-radius: var(--element-border-radius);
       display: flex;
+      flex-direction: row;
+      align-items: center;
     }
 
     .schema-editor .editor-add:not(.disabled) {
@@ -146,35 +565,20 @@
       position: relative;
       width: 28px;
       height: 28px;
-      opacity: 0.6;
       margin-left: 0.125rem;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+      margin-right: 0.5rem;
     }
 
-    .schema-editor .field-icon i {
-      width: 28px;
-      height: 28px;
-      font-size: 28px;
+    .schema-editor .field-element .field-icon {
+      opacity: 0.6;
     }
 
-    .schema-editor .field-icon.select i {
-      top: calc(50% + 2px);
-    }
-
-    .schema-editor .field-icon.integer i {
-      left: 5px;
-    }
-
-    .schema-editor i {
-      display: inline-block;
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
-      min-height: 24px;
-      color: currentColor;
-      vertical-align: middle;
+    .schema-editor .editor-add .field-icon {
+      opacity: 0.25;
     }
 
     .schema-editor .drag-handle {
@@ -187,33 +591,47 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      min-width: 28px;
+      flex-shrink: 0;
+      min-height: 44px;
+    }
+
+    .schema-editor .group > .drag-handle,
+    .schema-editor .repeatable-group > .drag-handle {
+      align-self: stretch;
+      margin-right: 0;
     }
 
     .schema-editor .drag-handle i {
-      font-size: 1em;
-      opacity: 0.6;
+      opacity: 0.8;
+      color: rgba(0, 0, 0, 0.5);
+    }
+
+    .schema-editor .group > .drag-handle i,
+    .schema-editor .repeatable-group > .drag-handle i {
+      --ggs: 1.2;
     }
 
     .schema-editor .editor-add .drag-handle {
-      background: none;
-      padding: 0 1rem 0 0;
-      min-width: auto;
+      padding: 0 1rem;
+      min-height: 44px;
     }
 
-    .schema-editor .editor-add .drag-handle i {
-      min-width: 20px;
-      min-height: 20px;
+    .schema-editor .field,
+    .schema-editor .group,
+    .schema-editor .repeatable-group {
+      display: flex;
     }
 
     .schema-editor .field-content,
     .schema-editor .group-content {
       flex-grow: 1;
       cursor: pointer;
+      display: flex;
+      flex-direction: column;
     }
 
     .schema-editor .field-content {
-      display: flex;
+      flex-direction: row;
     }
 
     .schema-editor .group-name button {

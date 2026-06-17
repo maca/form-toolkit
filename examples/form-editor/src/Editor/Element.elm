@@ -626,20 +626,20 @@ encode element =
                     maybeValue attributesValues
 
                 IntegerField { min, max } ->
-                    ( "min", Value.encode min )
-                        :: ( "max", Value.encode max )
+                    ( "min", Encode.string (Maybe.withDefault "" (Value.toString min)) )
+                        :: ( "max", Encode.string (Maybe.withDefault "" (Value.toString max)) )
                         :: attributesValues
                         |> maybeValue
 
                 DateField { min, max } ->
-                    ( "min", Value.encode min )
-                        :: ( "max", Value.encode max )
+                    ( "min", Encode.string (Maybe.withDefault "" (Value.toString min)) )
+                        :: ( "max", Encode.string (Maybe.withDefault "" (Value.toString max)) )
                         :: attributesValues
                         |> maybeValue
 
                 MonthField { min, max } ->
-                    ( "min", Value.encode min )
-                        :: ( "max", Value.encode max )
+                    ( "min", Encode.string (Maybe.withDefault "" (Value.toString min)) )
+                        :: ( "max", Encode.string (Maybe.withDefault "" (Value.toString max)) )
                         :: attributesValues
                         |> maybeValue
 

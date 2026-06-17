@@ -5,6 +5,8 @@ import Dict
 import Editor.Drag as Drag exposing (Drag(..), Position(..))
 import Editor.Element as Element exposing (Element(..))
 import Editor.Id as Id exposing (Id)
+import EditorForm
+import FormToolkit.Field as Field exposing (Field)
 import Html
     exposing
         ( Attribute
@@ -52,6 +54,7 @@ type alias Model =
     , selected : Maybe Element
     , dragAction : DragAction
     , locale : Locale
+    , editForm : EditorForm.EditorForm
     }
 
 
@@ -70,6 +73,7 @@ type Msg
     | DroppedOver Id
     | DragEnded
     | ElementRemoved Id
+    | FormMsg EditorForm.Msg
 
 
 init : Model
@@ -107,6 +111,7 @@ init =
     , selected = Nothing
     , dragAction = None
     , locale = ""
+    , editForm = EditorForm.init (Element.root [])
     }
 
 
@@ -114,7 +119,7 @@ update : Msg -> Model -> Model
 update msg model =
     case msg of
         ElementSelected element ->
-            { model | selected = Just element }
+            { model | selected = Just element, editForm = EditorForm.init element }
 
         OpenToggled elementId ->
             { model | element = toggleOpen elementId model.element }
@@ -174,6 +179,33 @@ update msg model =
                 | element = remove elementId model.element
                 , selected = Nothing
             }
+
+        FormMsg formMsg ->
+            let
+                ( newForm, maybeUpdatedElement ) =
+                    EditorForm.update formMsg model.editForm
+            in
+            case maybeUpdatedElement of
+                Just updatedElement ->
+                    { model
+                        | editForm = newForm
+                        , element = updateElementInTree updatedElement model.element
+                    }
+
+                Nothing ->
+                    { model | editForm = newForm }
+
+
+updateElementInTree : Element -> Element -> Element
+updateElementInTree updatedElement =
+    Element.map
+        (\element ->
+            if Element.id element == Element.id updatedElement then
+                updatedElement
+
+            else
+                element
+        )
 
 
 dragChanged : Id -> Drag -> Element -> Element
@@ -328,8 +360,6 @@ view model =
                     , addFieldHtml False Element.month
                     , addFieldHtml False (Element.select [])
                     , addFieldHtml False (Element.radio [])
-                    , addElementHtml False "review-addition" Element.review
-                    , addElementHtml False "help-addition" Element.help
                     , addElementHtml False "repeatable-group" Element.repeatableGroup
                     , addElementHtml False "group-addition" Element.group
                     ]
@@ -346,18 +376,19 @@ view model =
                             |> Element.elements
                             |> List.map (elementToHtml model.locale True selected)
                     )
-                , sidePane model.selected
+                , sidePane model.selected model.editForm
                 ]
             ]
         ]
 
 
-sidePane : Maybe Element -> Html Msg
-sidePane selected =
+sidePane : Maybe Element -> EditorForm.EditorForm -> Html Msg
+sidePane selected editForm =
     case selected of
         Just element ->
             aside [ class "side-pane" ]
-                [ h3 [] [ text "Selected Element" ]
+                [ h3 [] [ text "Edit Element" ]
+                , Html.map FormMsg (EditorForm.view editForm)
                 , div [] [ text ("ID: " ++ idToString (Element.id element)) ]
                 , button [ onClick (ElementRemoved (Element.id element)), class "button" ]
                     [ text "Remove Element" ]

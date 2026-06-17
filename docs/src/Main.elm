@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Chapters.Customization as Customization
 import Chapters.Fields as Fields
+import Chapters.FormEditor as FormEditor
 import Chapters.GeocodingAutocomplete as GeocodingAutocomplete
 import Chapters.GettingStarted as GettingStarted
 import Chapters.Internationalization as Internationalization
@@ -20,6 +21,7 @@ type alias Model =
     , geocodingAutocomplete : GeocodingAutocomplete.Model
     , customization : Customization.Model
     , internationalization : Internationalization.Model
+    , formEditor : FormEditor.Model
     }
 
 
@@ -32,6 +34,7 @@ init =
     , geocodingAutocomplete = GeocodingAutocomplete.init
     , customization = Customization.init
     , internationalization = Internationalization.init
+    , formEditor = FormEditor.init
     }
 
 
@@ -45,6 +48,7 @@ main =
             [ ( "Usage"
               , [ GettingStarted.chapter
                 , Fields.chapter
+                , FormEditor.chapter
                 , ParsingCookbook.chapter
                 , ParsingToJson.chapter
                 , GeocodingAutocomplete.chapter

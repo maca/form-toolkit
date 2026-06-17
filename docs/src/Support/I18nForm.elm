@@ -338,6 +338,9 @@ errorToSpanish attributes =
                 Error.ParseError _ ->
                     "No se pudo procesar"
 
+                Error.MimeTypeInvalid _ _ ->
+                    "Archivos de ese tipo no son aceptados"
+
                 Error.CustomError _ message ->
                     message
     in
