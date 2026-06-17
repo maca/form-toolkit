@@ -2,6 +2,7 @@ module EditorForm exposing (EditorForm, Msg, init, update, view)
 
 import Editor.Element as Element exposing (Element(..), Field(..))
 import FormToolkit.Field as FormField exposing (Field)
+import FormToolkit.Error exposing (Error)
 import FormToolkit.Parse as Parse
 import FormToolkit.Value as Value exposing (Value)
 import Html exposing (Html)
@@ -39,19 +40,23 @@ init element =
     }
 
 
-update : Msg -> EditorForm -> ( EditorForm, Maybe Element )
+update : Msg -> EditorForm -> ( EditorForm, Result (Error FieldId) Element )
 update msg form =
     case msg of
         FieldMsg fieldMsg ->
             let
                 newField = FormField.update fieldMsg form.field
                 updatedElement = parseElement form.element newField
+                _ = Debug.log "parseElement result" updatedElement
             in
-            ( { form | field = newField }, Just updatedElement )
+            ( { form | field = newField, element = Result.withDefault form.element updatedElement }, updatedElement )
 
 
 view : EditorForm -> Html Msg
 view form =
+    let
+        _ = Debug.log "EditorForm.view element" form.element
+    in
     FormField.toHtml FieldMsg form.field
 
 
@@ -114,25 +119,24 @@ textFieldForm params =
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             , FormField.hint "Can only contain downcase and `_` characters"
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (Value.string params.label)
+            , FormField.value (Value.string (Maybe.withDefault "" params.label))
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (Value.string params.placeholder)
+            , FormField.value (Value.string (Maybe.withDefault "" params.placeholder))
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (Value.string params.hint)
+            , FormField.value (Value.string (Maybe.withDefault "" params.hint))
             ]
         , FormField.checkbox
             [ FormField.identifier RequiredId
@@ -142,7 +146,7 @@ textFieldForm params =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (Value.string params.help)
+            , FormField.value (Value.string (Maybe.withDefault "" params.help))
             ]
         ]
 
@@ -153,30 +157,29 @@ checkboxFieldForm params =
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             , FormField.hint "Can only contain downcase and `_` characters"
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (Value.string params.label)
+            , FormField.value (Value.string (Maybe.withDefault "" params.label))
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (Value.string params.placeholder)
+            , FormField.value (Value.string (Maybe.withDefault "" params.placeholder))
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (Value.string params.hint)
+            , FormField.value (Value.string (Maybe.withDefault "" params.hint))
             ]
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (Value.string params.help)
+            , FormField.value (Value.string (Maybe.withDefault "" params.help))
             ]
         ]
 
@@ -187,28 +190,27 @@ rangeFieldForm params minField maxField =
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             , FormField.hint "Can only contain downcase and `_` characters"
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (Value.string params.label)
+            , FormField.value (Value.string (Maybe.withDefault "" params.label))
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (Value.string params.placeholder)
+            , FormField.value (Value.string (Maybe.withDefault "" params.placeholder))
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (Value.string params.hint)
+            , FormField.value (Value.string (Maybe.withDefault "" params.hint))
             ]
-        , FormField.group []
-            [ minField, maxField ]
+        , minField
+        , maxField
         , FormField.checkbox
             [ FormField.identifier RequiredId
             , FormField.label "Is Required?"
@@ -217,7 +219,7 @@ rangeFieldForm params minField maxField =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (Value.string params.help)
+            , FormField.value (Value.string (Maybe.withDefault "" params.help))
             ]
         ]
 
@@ -228,25 +230,24 @@ optionsFieldForm params options =
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             , FormField.hint "Can only contain downcase and `_` characters"
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (Value.string params.label)
+            , FormField.value (Value.string (Maybe.withDefault "" params.label))
             , FormField.hint "If not provided **Field Name** will be used"
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
             , FormField.label "Placeholder"
-            , FormField.value (Value.string params.placeholder)
+            , FormField.value (Value.string (Maybe.withDefault "" params.placeholder))
             ]
         , FormField.text
             [ FormField.identifier HintId
             , FormField.label "Hint"
-            , FormField.value (Value.string params.hint)
+            , FormField.value (Value.string (Maybe.withDefault "" params.hint))
             ]
         , FormField.checkbox
             [ FormField.identifier RequiredId
@@ -262,7 +263,7 @@ optionsFieldForm params options =
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Field Help"
-            , FormField.value (Value.string params.help)
+            , FormField.value (Value.string (Maybe.withDefault "" params.help))
             ]
         ]
 
@@ -291,20 +292,19 @@ optionInitializer ( optionValue, label_ ) =
             |> FormField.updateWithId OptionLabelId (FormField.value (Value.string label_))
 
 
-fromGroupElement : { a | name : String, label : String, inline : Bool } -> Field FieldId
+fromGroupElement : { a | name : Maybe String, label : Maybe String, inline : Bool } -> Field FieldId
 fromGroupElement params =
     FormField.group []
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             , FormField.hint "Can only contain downcase and `_` characters"
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (Value.string params.label)
+            , FormField.value (Value.string (Maybe.withDefault "" params.label))
             ]
         , FormField.select
             [ FormField.identifier InlineId
@@ -319,20 +319,19 @@ fromGroupElement params =
         ]
 
 
-fromRepeatableGroupElement : { a | name : String, label : String, inline : Bool } -> Field FieldId
+fromRepeatableGroupElement : { a | name : Maybe String, label : Maybe String, inline : Bool } -> Field FieldId
 fromRepeatableGroupElement params =
     FormField.group []
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             , FormField.hint "Can only contain downcase and `_` characters"
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Label"
-            , FormField.value (Value.string params.label)
+            , FormField.value (Value.string (Maybe.withDefault "" params.label))
             ]
         , FormField.select
             [ FormField.identifier InlineId
@@ -347,96 +346,136 @@ fromRepeatableGroupElement params =
         ]
 
 
-reviewForm : { a | name : String, text : String } -> Field FieldId
+reviewForm : { a | name : Maybe String, text : Maybe String } -> Field FieldId
 reviewForm params =
     FormField.group []
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             ]
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Text"
-            , FormField.value (Value.string params.text)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.text))
             ]
         ]
 
 
-helpForm : { a | name : String, button : String, text : String } -> Field FieldId
+helpForm : { a | name : Maybe String, button : Maybe String, text : Maybe String } -> Field FieldId
 helpForm params =
     FormField.group []
         [ FormField.text
             [ FormField.identifier NameId
             , FormField.label "Name"
-            , FormField.value (Value.string params.name)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.name))
             ]
         , FormField.textarea
             [ FormField.identifier HelpId
             , FormField.label "Text"
-            , FormField.value (Value.string params.text)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.text))
             ]
         , FormField.text
             [ FormField.identifier LabelId
             , FormField.label "Button Text"
-            , FormField.value (Value.string params.button)
-            , FormField.required True
+            , FormField.value (Value.string (Maybe.withDefault "" params.button))
             ]
         ]
 
 
-parseElement : Element -> Field FieldId -> Element
+parseElement : Element -> Field FieldId -> Result (Error FieldId) Element
 parseElement element field =
     case element of
         FieldElement params ->
-            FieldElement
-                { params
-                    | name = getStringValue NameId field params.name
-                    , label = getStringValue LabelId field params.label
-                    , placeholder = getStringValue PlaceholderId field params.placeholder
-                    , hint = getStringValue HintId field params.hint
-                    , help = getStringValue HelpId field params.help
-                    , isRequired = getBoolValue RequiredId field params.isRequired
-                    , field = parseFieldType params.field field
-                }
+            Parse.parse
+                (Parse.map4
+                    (\name label required placeholder ->
+                        FieldElement
+                            { params
+                                | name = name
+                                , label = label
+                                , placeholder = placeholder
+                                , hint = Parse.parse (Parse.field HintId (Parse.maybe Parse.string)) field |> Result.withDefault params.hint
+                                , help = Parse.parse (Parse.field HelpId (Parse.maybe Parse.string)) field |> Result.withDefault params.help
+                                , isRequired = required
+                                , field = parseFieldType params.field field
+                            }
+                    )
+                    (Parse.field NameId (Parse.maybe Parse.string))
+                    (Parse.field LabelId (Parse.maybe Parse.string))
+                    (Parse.maybe (Parse.field RequiredId Parse.bool) |> Parse.map (Maybe.withDefault params.isRequired))
+                    (Parse.field PlaceholderId (Parse.maybe Parse.string))
+                )
+                field
 
         ElementGroup params ->
-            ElementGroup
-                { params
-                    | name = getStringValue NameId field params.name
-                    , label = getStringValue LabelId field params.label
-                    , inline = getBoolValue InlineId field params.inline
-                }
+            Parse.parse
+                (Parse.map3
+                    (\name label inline ->
+                        ElementGroup
+                            { params
+                                | name = name
+                                , label = label
+                                , inline = inline
+                            }
+                    )
+                    (Parse.field NameId (Parse.maybe Parse.string))
+                    (Parse.field LabelId (Parse.maybe Parse.string))
+                    (Parse.maybe (Parse.field InlineId Parse.bool) |> Parse.map (Maybe.withDefault params.inline))
+                )
+                field
 
         RepeatableGroup params ->
-            RepeatableGroup
-                { params
-                    | name = getStringValue NameId field params.name
-                    , label = getStringValue LabelId field params.label
-                    , inline = getBoolValue InlineId field params.inline
-                }
+            Parse.parse
+                (Parse.map3
+                    (\name label inline ->
+                        RepeatableGroup
+                            { params
+                                | name = name
+                                , label = label
+                                , inline = inline
+                            }
+                    )
+                    (Parse.field NameId (Parse.maybe Parse.string))
+                    (Parse.field LabelId (Parse.maybe Parse.string))
+                    (Parse.maybe (Parse.field InlineId Parse.bool) |> Parse.map (Maybe.withDefault params.inline))
+                )
+                field
 
         Review params ->
-            Review
-                { params
-                    | name = getStringValue NameId field params.name
-                    , text = getStringValue HelpId field params.text
-                }
+            Parse.parse
+                (Parse.map2
+                    (\name text ->
+                        Review
+                            { params
+                                | name = name
+                                , text = text
+                            }
+                    )
+                    (Parse.field NameId (Parse.maybe Parse.string))
+                    (Parse.field HelpId (Parse.maybe Parse.string))
+                )
+                field
 
         Help params ->
-            Help
-                { params
-                    | name = getStringValue NameId field params.name
-                    , text = getStringValue HelpId field params.text
-                    , button = getStringValue LabelId field params.button
-                }
+            Parse.parse
+                (Parse.map3
+                    (\name text button ->
+                        Help
+                            { params
+                                | name = name
+                                , text = text
+                                , button = button
+                            }
+                    )
+                    (Parse.field NameId (Parse.maybe Parse.string))
+                    (Parse.field HelpId (Parse.maybe Parse.string))
+                    (Parse.field LabelId (Parse.maybe Parse.string))
+                )
+                field
 
         _ ->
-            element
+            Ok element
 
 
 parseFieldType : Element.Field -> Field FieldId -> Element.Field

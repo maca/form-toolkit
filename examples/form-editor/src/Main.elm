@@ -6,6 +6,7 @@ import Editor.Element as Element exposing (Element(..))
 import Editor.Id as Id exposing (Id)
 import EditorForm
 import FormToolkit.Field as Field exposing (Field)
+import FormToolkit.Value as Value
 import Html
     exposing
         ( Attribute
@@ -61,6 +62,10 @@ type Tab
     | JsonTab
 
 
+type PreviewId
+    = PreviewId
+
+
 type DragAction
     = None
     | Add Element
@@ -78,6 +83,7 @@ type Msg
     | ElementRemoved Id
     | FormMsg EditorForm.Msg
     | TabSwitched Tab
+    | NoOp
 
 
 init : Model
@@ -88,19 +94,19 @@ init =
                 (Element.root
                     [ ElementGroup
                         { id = Id.unset
-                        , name = "fields"
-                        , label = ""
+                        , name = Just "fields"
+                        , label = Nothing
                         , inline = False
                         , elements =
                             [ FieldElement
                                 { id = Id.unset
                                 , field = Element.TextField
-                                , name = "text_field"
+                                , name = Just "text_field"
                                 , isRequired = False
-                                , label = ""
-                                , placeholder = ""
-                                , hint = ""
-                                , help = ""
+                                , label = Nothing
+                                , placeholder = Nothing
+                                , hint = Nothing
+                                , help = Nothing
                                 , drag = Drag.idle
                                 }
                             ]
@@ -146,7 +152,9 @@ update msg model =
         DraggedOver isTopLevel containerId position ->
             { model
                 | element =
-                    draggedOver isTopLevel containerId position
+                    draggedOver isTopLevel
+                        containerId
+                        position
                         (draggedElement model.dragAction)
                         model.element
             }
@@ -161,6 +169,7 @@ update msg model =
                     { model
                         | element = droppedOver containerId element_ model.element
                         , selected = Just element_
+                        , editForm = EditorForm.init element_
                         , dragAction = None
                         , nextNode = nextId
                     }
@@ -169,6 +178,7 @@ update msg model =
                     { model
                         | element = droppedOver containerId element model.element
                         , selected = Just element
+                        , editForm = EditorForm.init element
                         , dragAction = None
                     }
 
@@ -186,22 +196,26 @@ update msg model =
 
         FormMsg formMsg ->
             let
-                ( newForm, maybeUpdatedElement ) =
+                ( newForm, resultUpdatedElement ) =
                     EditorForm.update formMsg model.editForm
+                        |> Debug.log "form update"
             in
-            case maybeUpdatedElement of
-                Just updatedElement ->
+            case resultUpdatedElement of
+                Ok updatedElement ->
                     { model
                         | editForm = newForm
                         , element = updateElementInTree updatedElement model.element
                         , selected = Just updatedElement
                     }
 
-                Nothing ->
+                Err _ ->
                     { model | editForm = newForm }
 
         TabSwitched tab ->
             { model | activeTab = tab }
+
+        NoOp ->
+            model
 
 
 updateElementInTree : Element -> Element -> Element
@@ -355,6 +369,123 @@ remove elementId =
         )
 
 
+elementToPreviewField : Element -> Maybe (Field PreviewId)
+elementToPreviewField element =
+    case element of
+        FieldElement params ->
+            Just
+                (case params.field of
+                    Element.TextField ->
+                        Field.text
+                            [ Field.label (params.label |> Maybe.withDefault "")
+                            , Field.placeholder (params.placeholder |> Maybe.withDefault "")
+                            , Field.hint (params.hint |> Maybe.withDefault "")
+                            , Field.required params.isRequired
+                            , Field.disabled True
+                            ]
+
+                    Element.Checkbox ->
+                        Field.checkbox
+                            [ Field.label (params.label |> Maybe.withDefault "")
+                            , Field.hint (params.hint |> Maybe.withDefault "")
+                            , Field.disabled True
+                            ]
+
+                    Element.IntegerField { min, max } ->
+                        Field.int
+                            [ Field.label (params.label |> Maybe.withDefault "")
+                            , Field.placeholder (params.placeholder |> Maybe.withDefault "")
+                            , Field.hint (params.hint |> Maybe.withDefault "")
+                            , Field.min min
+                            , Field.max max
+                            , Field.required params.isRequired
+                            , Field.disabled True
+                            ]
+
+                    Element.DateField { min, max } ->
+                        Field.date
+                            [ Field.label (params.label |> Maybe.withDefault "")
+                            , Field.hint (params.hint |> Maybe.withDefault "")
+                            , Field.min min
+                            , Field.max max
+                            , Field.required params.isRequired
+                            , Field.disabled True
+                            ]
+
+                    Element.MonthField { min, max } ->
+                        Field.month
+                            [ Field.label (params.label |> Maybe.withDefault "")
+                            , Field.hint (params.hint |> Maybe.withDefault "")
+                            , Field.min min
+                            , Field.max max
+                            , Field.required params.isRequired
+                            , Field.disabled True
+                            ]
+
+                    Element.Select options ->
+                        Field.select
+                            [ Field.label (params.label |> Maybe.withDefault "")
+                            , Field.placeholder (params.placeholder |> Maybe.withDefault "")
+                            , Field.hint (params.hint |> Maybe.withDefault "")
+                            , Field.options (List.map (\( v, l ) -> ( l, Value.string v )) options)
+                            , Field.required params.isRequired
+                            , Field.disabled True
+                            ]
+
+                    Element.Radio options ->
+                        Field.radio
+                            [ Field.label (params.label |> Maybe.withDefault "")
+                            , Field.hint (params.hint |> Maybe.withDefault "")
+                            , Field.options (List.map (\( v, l ) -> ( l, Value.string v )) options)
+                            , Field.required params.isRequired
+                            , Field.disabled True
+                            ]
+                )
+
+        ElementGroup params ->
+            let
+                children =
+                    List.filterMap elementToPreviewField params.elements
+            in
+            if List.isEmpty children then
+                Nothing
+
+            else
+                Just (Field.group [ Field.label (params.label |> Maybe.withDefault "") ] children)
+
+        RepeatableGroup params ->
+            let
+                children =
+                    List.filterMap elementToPreviewField params.elements
+            in
+            if List.isEmpty children then
+                Nothing
+
+            else
+                Just (Field.group [ Field.label (params.label |> Maybe.withDefault "") ] children)
+
+        Review params ->
+            Just
+                (Field.textarea
+                    [ Field.label (params.name |> Maybe.withDefault "")
+                    , Field.value (Value.string (params.text |> Maybe.withDefault ""))
+                    , Field.disabled True
+                    ]
+                )
+
+        Help params ->
+            Just
+                (Field.text
+                    [ Field.label (params.button |> Maybe.withDefault "")
+                    , Field.value (Value.string (params.text |> Maybe.withDefault ""))
+                    , Field.disabled True
+                    ]
+                )
+
+        Blank _ ->
+            Nothing
+
+
 view : Model -> Html Msg
 view model =
     div [ class "editor-layout" ]
@@ -411,8 +542,17 @@ view model =
             , div [ class "tab-content" ]
                 (case model.activeTab of
                     PreviewTab ->
+                        let
+                            children =
+                                Element.elements model.element
+                                    |> List.filterMap elementToPreviewField
+                        in
                         [ div [ class "tab-pane" ]
-                            [ text "Preview content coming soon" ]
+                            [ Html.map (always NoOp)
+                                (Field.toHtml identity
+                                    (Field.group [] children)
+                                )
+                            ]
                         ]
 
                     JsonTab ->

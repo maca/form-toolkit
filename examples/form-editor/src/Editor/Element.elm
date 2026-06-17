@@ -65,11 +65,11 @@ type alias Options =
 
 
 type alias FieldParams =
-    { name : String
-    , label : String
-    , placeholder : String
-    , hint : String
-    , help : String
+    { name : Maybe String
+    , label : Maybe String
+    , placeholder : Maybe String
+    , hint : Maybe String
+    , help : Maybe String
     , isRequired : Bool
     , field : Field
     , id : Id
@@ -80,21 +80,21 @@ type alias FieldParams =
 type Element
     = FieldElement FieldParams
     | Review
-        { name : String
-        , text : String
+        { name : Maybe String
+        , text : Maybe String
         , id : Id
         , drag : Drag
         }
     | Help
-        { name : String
-        , button : String
-        , text : String
+        { name : Maybe String
+        , button : Maybe String
+        , text : Maybe String
         , id : Id
         , drag : Drag
         }
     | RepeatableGroup
-        { name : String
-        , label : String
+        { name : Maybe String
+        , label : Maybe String
         , inline : Bool
         , elements : List Element
         , id : Id
@@ -102,8 +102,8 @@ type Element
         , isOpen : Bool
         }
     | ElementGroup
-        { name : String
-        , label : String
+        { name : Maybe String
+        , label : Maybe String
         , inline : Bool
         , elements : List Element
         , id : Id
@@ -152,8 +152,8 @@ group : Element
 group =
     ElementGroup
         { id = Id.unset
-        , name = ""
-        , label = ""
+        , name = Nothing
+        , label = Nothing
         , inline = False
         , elements = []
         , isOpen = False
@@ -165,8 +165,8 @@ repeatableGroup : Element
 repeatableGroup =
     RepeatableGroup
         { id = Id.unset
-        , name = ""
-        , label = ""
+        , name = Nothing
+        , label = Nothing
         , inline = False
         , elements = []
         , drag = Drag.idle
@@ -178,8 +178,8 @@ review : Element
 review =
     Review
         { id = Id.unset
-        , name = ""
-        , text = ""
+        , name = Nothing
+        , text = Nothing
         , drag = Drag.idle
         }
 
@@ -188,9 +188,9 @@ help : Element
 help =
     Help
         { id = Id.unset
-        , name = ""
-        , button = ""
-        , text = ""
+        , name = Nothing
+        , button = Nothing
+        , text = Nothing
         , drag = Drag.idle
         }
 
@@ -199,8 +199,8 @@ root : List Element -> Element
 root children =
     ElementGroup
         { id = Id.unset
-        , name = "root"
-        , label = ""
+        , name = Just "root"
+        , label = Nothing
         , inline = False
         , elements = children
         , drag = Drag.idle
@@ -280,19 +280,19 @@ name : Element -> String
 name element =
     case element of
         ElementGroup params ->
-            params.name
+            params.name |> Maybe.withDefault ""
 
         RepeatableGroup params ->
-            params.name
+            params.name |> Maybe.withDefault ""
 
         FieldElement params ->
-            params.name
+            params.name |> Maybe.withDefault ""
 
         Review params ->
-            params.name
+            params.name |> Maybe.withDefault ""
 
         Help params ->
-            params.name
+            params.name |> Maybe.withDefault ""
 
         Blank _ ->
             ""
@@ -302,39 +302,24 @@ label : Element -> String
 label element =
     case element of
         ElementGroup params ->
-            if String.isEmpty params.label then
-                "Group"
-
-            else
-                params.label
+            params.label
+                |> Maybe.withDefault "Group"
 
         RepeatableGroup params ->
-            if String.isEmpty params.label then
-                "Repeatable"
-
-            else
-                params.label
+            params.label
+                |> Maybe.withDefault "Repeatable"
 
         FieldElement params ->
-            if String.isEmpty params.label then
-                String.toSentenceCase (elementType element)
-
-            else
-                params.label
+            params.label
+                |> Maybe.withDefault (String.toSentenceCase (elementType element))
 
         Review params ->
-            if String.isEmpty params.name then
-                "Review"
-
-            else
-                params.name
+            params.name
+                |> Maybe.withDefault "Review"
 
         Help params ->
-            if String.isEmpty params.button then
-                "Help"
-
-            else
-                params.button
+            params.button
+                |> Maybe.withDefault "Help"
 
         Blank _ ->
             ""
@@ -572,8 +557,8 @@ encode element =
             maybeValue
                 [ ( "type", Encode.string (elementType element) )
                 , ( "inline", Encode.bool attrs.inline )
-                , ( "name", Encode.string attrs.name )
-                , ( "label", Encode.string attrs.label )
+                , ( "name", encodeMaybeString attrs.name )
+                , ( "label", encodeMaybeString attrs.label )
                 , ( "fields"
                   , Encode.list identity (List.filterMap encode attrs.elements)
                   )
@@ -583,8 +568,8 @@ encode element =
             maybeValue
                 [ ( "type", Encode.string (elementType element) )
                 , ( "inline", Encode.bool attrs.inline )
-                , ( "name", Encode.string attrs.name )
-                , ( "label", Encode.string attrs.label )
+                , ( "name", encodeMaybeString attrs.name )
+                , ( "label", encodeMaybeString attrs.label )
                 , ( "fields"
                   , Encode.list identity (List.filterMap encode attrs.elements)
                   )
@@ -594,11 +579,11 @@ encode element =
             let
                 attributesValues =
                     [ ( "type", Encode.string (elementType element) )
-                    , ( "name", Encode.string attrs.name )
-                    , ( "label", Encode.string attrs.label )
-                    , ( "placeholder", Encode.string attrs.placeholder )
-                    , ( "help", Encode.string attrs.help )
-                    , ( "hint", Encode.string attrs.help )
+                    , ( "name", encodeMaybeString attrs.name )
+                    , ( "label", encodeMaybeString attrs.label )
+                    , ( "placeholder", encodeMaybeString attrs.placeholder )
+                    , ( "help", encodeMaybeString attrs.help )
+                    , ( "hint", encodeMaybeString attrs.help )
                     , ( "required", Encode.bool attrs.isRequired )
                     ]
             in
@@ -640,20 +625,25 @@ encode element =
         Review attrs ->
             maybeValue
                 [ ( "type", Encode.string (elementType element) )
-                , ( "name", Encode.string attrs.name )
-                , ( "text", Encode.string attrs.text )
+                , ( "name", encodeMaybeString attrs.name )
+                , ( "text", encodeMaybeString attrs.text )
                 ]
 
         Help attrs ->
             maybeValue
                 [ ( "type", Encode.string (elementType element) )
-                , ( "name", Encode.string attrs.name )
-                , ( "button", Encode.string attrs.button )
-                , ( "text", Encode.string attrs.text )
+                , ( "name", encodeMaybeString attrs.name )
+                , ( "button", encodeMaybeString attrs.button )
+                , ( "text", encodeMaybeString attrs.text )
                 ]
 
         Blank _ ->
             Nothing
+
+
+encodeMaybeString : Maybe String -> Encode.Value
+encodeMaybeString =
+    Maybe.map Encode.string >> Maybe.withDefault Encode.null
 
 
 encodeOptions : Options -> Encode.Value
@@ -676,12 +666,12 @@ makeField field =
     FieldElement
         { id = Id.unset
         , field = field
-        , name = ""
+        , name = Nothing
         , isRequired = False
-        , label = ""
-        , placeholder = ""
-        , hint = ""
-        , help = ""
+        , label = Nothing
+        , placeholder = Nothing
+        , hint = Nothing
+        , help = Nothing
         , drag = Drag.idle
         }
 
