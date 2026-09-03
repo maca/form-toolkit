@@ -483,8 +483,7 @@ toggleOpen element =
             ElementGroup { params | isOpen = not params.isOpen }
 
         RepeatableGroup params ->
-            RepeatableGroup
-                { params | elements = List.map toggleOpen params.elements }
+            RepeatableGroup { params | isOpen = not params.isOpen }
 
         _ ->
             element

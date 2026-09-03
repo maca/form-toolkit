@@ -1,4 +1,4 @@
-module EditorForm exposing (EditorForm, Msg, init, update, view)
+module EditorForm exposing (EditorForm, Msg, init, isValid, update, view)
 
 import Editor.Element as Element exposing (Element(..), Field(..))
 import FormToolkit.Field as FormField exposing (Field)
@@ -38,6 +38,16 @@ init element =
     { element = element
     , field = fromElement element
     }
+
+
+isValid : Element -> Bool
+isValid element =
+    case parseElement element (fromElement element) of
+        Ok _ ->
+            True
+
+        Err _ ->
+            False
 
 
 update : Msg -> EditorForm -> ( EditorForm, Result (Error FieldId) Element )
@@ -93,18 +103,18 @@ fromFieldElement params =
 
         IntegerField { min, max } ->
             rangeFieldForm params
-                (FormField.int [ FormField.identifier MinId, FormField.value min ])
-                (FormField.int [ FormField.identifier MaxId, FormField.value max ])
+                (FormField.text [ FormField.identifier MinId, FormField.label "Min", FormField.value (Value.string (Maybe.withDefault "" (Value.toString min))) ])
+                (FormField.text [ FormField.identifier MaxId, FormField.label "Max", FormField.value (Value.string (Maybe.withDefault "" (Value.toString max))) ])
 
         DateField { min, max } ->
             rangeFieldForm params
-                (FormField.date [ FormField.identifier MinId, FormField.value min ])
-                (FormField.date [ FormField.identifier MaxId, FormField.value max ])
+                (FormField.text [ FormField.identifier MinId, FormField.label "Min", FormField.value (Value.string (Maybe.withDefault "" (Value.toString min))) ])
+                (FormField.text [ FormField.identifier MaxId, FormField.label "Max", FormField.value (Value.string (Maybe.withDefault "" (Value.toString max))) ])
 
         MonthField { min, max } ->
             rangeFieldForm params
-                (FormField.month [ FormField.identifier MinId, FormField.value min ])
-                (FormField.month [ FormField.identifier MaxId, FormField.value max ])
+                (FormField.text [ FormField.identifier MinId, FormField.label "Min", FormField.value (Value.string (Maybe.withDefault "" (Value.toString min))) ])
+                (FormField.text [ FormField.identifier MaxId, FormField.label "Max", FormField.value (Value.string (Maybe.withDefault "" (Value.toString max))) ])
 
         Select options ->
             optionsFieldForm params options
@@ -126,7 +136,7 @@ textFieldForm params =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
-            , FormField.hint "If not provided **Field Name** will be used"
+            , FormField.required True
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
@@ -164,7 +174,7 @@ checkboxFieldForm params =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
-            , FormField.hint "If not provided **Field Name** will be used"
+            , FormField.required True
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
@@ -175,6 +185,11 @@ checkboxFieldForm params =
             [ FormField.identifier HintId
             , FormField.label "Hint"
             , FormField.value (Value.string (Maybe.withDefault "" params.hint))
+            ]
+        , FormField.checkbox
+            [ FormField.identifier RequiredId
+            , FormField.label "Is Required?"
+            , FormField.value (Value.bool params.isRequired)
             ]
         , FormField.textarea
             [ FormField.identifier HelpId
@@ -197,7 +212,7 @@ rangeFieldForm params minField maxField =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
-            , FormField.hint "If not provided **Field Name** will be used"
+            , FormField.required True
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
@@ -237,7 +252,7 @@ optionsFieldForm params options =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
-            , FormField.hint "If not provided **Field Name** will be used"
+            , FormField.required True
             ]
         , FormField.text
             [ FormField.identifier PlaceholderId
@@ -305,6 +320,7 @@ fromGroupElement params =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
+            , FormField.required True
             ]
         , FormField.select
             [ FormField.identifier InlineId
@@ -332,6 +348,7 @@ fromRepeatableGroupElement params =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
+            , FormField.required True
             ]
         , FormField.select
             [ FormField.identifier InlineId
@@ -387,23 +404,34 @@ parseElement : Element -> Field FieldId -> Result (Error FieldId) Element
 parseElement element field =
     case element of
         FieldElement params ->
+            let
+                required =
+                    getBoolValue RequiredId field params.isRequired
+
+                hint =
+                    Parse.parse (Parse.field HintId (Parse.maybe Parse.string)) field
+                        |> Result.withDefault params.hint
+
+                help =
+                    Parse.parse (Parse.field HelpId (Parse.maybe Parse.string)) field
+                        |> Result.withDefault params.help
+            in
             Parse.parse
-                (Parse.map4
-                    (\name label required placeholder ->
+                (Parse.map3
+                    (\name label placeholder ->
                         FieldElement
                             { params
                                 | name = name
                                 , label = label
                                 , placeholder = placeholder
-                                , hint = Parse.parse (Parse.field HintId (Parse.maybe Parse.string)) field |> Result.withDefault params.hint
-                                , help = Parse.parse (Parse.field HelpId (Parse.maybe Parse.string)) field |> Result.withDefault params.help
+                                , hint = hint
+                                , help = help
                                 , isRequired = required
                                 , field = parseFieldType params.field field
                             }
                     )
                     (Parse.field NameId (Parse.maybe Parse.string))
                     (Parse.field LabelId (Parse.maybe Parse.string))
-                    (Parse.maybe (Parse.field RequiredId Parse.bool) |> Parse.map (Maybe.withDefault params.isRequired))
                     (Parse.field PlaceholderId (Parse.maybe Parse.string))
                 )
                 field

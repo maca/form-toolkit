@@ -78,7 +78,7 @@ type Msg
     | DragEnabled Id
     | DragStarted DragAction
     | DraggedOver Bool Id Position
-    | DroppedOver Id
+    | DroppedOver
     | DragEnded
     | ElementRemoved Id
     | FormMsg EditorForm.Msg
@@ -159,7 +159,7 @@ update msg model =
                         model.element
             }
 
-        DroppedOver containerId ->
+        DroppedOver ->
             case model.dragAction of
                 Add element ->
                     let
@@ -167,7 +167,7 @@ update msg model =
                             Element.updateIds model.nextNode element
                     in
                     { model
-                        | element = droppedOver containerId element_ model.element
+                        | element = droppedOver element_ model.element
                         , selected = Just element_
                         , editForm = EditorForm.init element_
                         , dragAction = None
@@ -176,7 +176,7 @@ update msg model =
 
                 Move element ->
                     { model
-                        | element = droppedOver containerId element model.element
+                        | element = droppedOver element model.element
                         , selected = Just element
                         , editForm = EditorForm.init element
                         , dragAction = None
@@ -186,7 +186,10 @@ update msg model =
                     model
 
         DragEnded ->
-            { model | element = dragEnded model.element }
+            { model
+                | element = dragEnded model.element
+                , dragAction = None
+            }
 
         ElementRemoved elementId ->
             { model
@@ -198,7 +201,6 @@ update msg model =
             let
                 ( newForm, resultUpdatedElement ) =
                     EditorForm.update formMsg model.editForm
-                        |> Debug.log "form update"
             in
             case resultUpdatedElement of
                 Ok updatedElement ->
@@ -281,15 +283,17 @@ draggedOverHelp containerId position placeholder element =
         if Element.isPlaceholder element then
             [ element ]
 
-        else
-            addPlaceholder position placeholder <|
-                if Element.isEmptyGroup element then
-                    element
-                        |> Element.open True
-                        |> Element.prepend Element.groupPlaceholder
+        else if Element.isEmptyGroup element then
+            -- an empty group only ever offers "drop into me" (the
+            -- groupPlaceholder below); it must not also gain a sibling
+            -- placeholder, or a drop could match either one and duplicate
+            [ element
+                |> Element.open True
+                |> Element.prepend Element.groupPlaceholder
+            ]
 
-                else
-                    Element.open True element
+        else
+            addPlaceholder position placeholder (Element.open True element)
 
     else if Element.isPlaceholder element then
         []
@@ -309,20 +313,16 @@ addPlaceholder position placeholder element =
                 [ Just element, placeholder ]
 
 
-droppedOver : Id -> Element -> Element -> Element
-droppedOver containerId dropped editorRoot =
-    if Element.id editorRoot == containerId then
+droppedOver : Element -> Element -> Element
+droppedOver dropped editorRoot =
+    if Element.isEmptyGroup editorRoot then
         Element.prepend dropped editorRoot
 
-    else
+    else if hasPlaceholder editorRoot then
         editorRoot
             |> Element.concatMap
                 (\element ->
-                    if
-                        Element.id element
-                            == containerId
-                            && Element.isPlaceholder element
-                    then
+                    if Element.isPlaceholder element then
                         [ dropped ]
 
                     else if Element.id element == Element.id dropped then
@@ -331,6 +331,14 @@ droppedOver containerId dropped editorRoot =
                     else
                         [ element ]
                 )
+
+    else
+        editorRoot
+
+
+hasPlaceholder : Element -> Bool
+hasPlaceholder =
+    Element.foldl (\element acc -> acc || Element.isPlaceholder element) False
 
 
 dragEnded : Element -> Element
@@ -343,6 +351,7 @@ dragEnded =
             else
                 [ Element.updateDrag Drag.idle element ]
         )
+        >> Element.updateDrag Drag.idle
 
 
 toggleOpen : Id -> Element -> Element
@@ -371,6 +380,15 @@ remove elementId =
 
 elementToPreviewField : Element -> Maybe (Field PreviewId)
 elementToPreviewField element =
+    if EditorForm.isValid element then
+        buildPreviewField element
+
+    else
+        Nothing
+
+
+buildPreviewField : Element -> Maybe (Field PreviewId)
+buildPreviewField element =
     case element of
         FieldElement params ->
             Just
@@ -746,9 +764,6 @@ placeholderHtml : Element -> Html Msg
 placeholderHtml element =
     div
         (class "element placeholder-element"
-            :: (customOn "drop" <|
-                    Decode.succeed (DroppedOver (Element.id element))
-               )
             :: dragAttributes
                 { isTopLevel = False
                 , selected = Nothing
@@ -791,6 +806,7 @@ dragAttributes { isTopLevel, selected, draggable, container } =
                 (Decode.map (DraggedOver isTopLevel containerId)
                     Drag.positionDecoder
                 )
+            , customOn "drop" (Decode.succeed DroppedOver)
             , on "dragend" (Decode.succeed DragEnded)
             , class "drag-idle"
             , selectionClass
@@ -800,6 +816,7 @@ dragAttributes { isTopLevel, selected, draggable, container } =
             [ Attributes.draggable "true"
             , on "dragstart" <| Decode.succeed (DragStarted (Move draggable))
             , on "dragend" (Decode.succeed DragEnded)
+            , customOn "drop" (Decode.succeed DroppedOver)
             , class "drag-enabled"
             , selectionClass
             ]
@@ -815,11 +832,18 @@ dragHandle : Element -> Html Msg
 dragHandle element =
     div
         (class "drag-handle"
-            :: (if Element.drag element == Drag.idle then
-                    [ onMouseDown (DragEnabled (Element.id element)) ]
+            :: (case Element.drag element of
+                    Drag.Idle ->
+                        [ onMouseDown (DragEnabled (Element.id element)) ]
 
-                else
-                    []
+                    Drag.Enabled ->
+                        -- a plain click (mousedown without a following native
+                        -- drag) must not leave the element stuck Enabled,
+                        -- since Enabled elements aren't valid drop targets
+                        [ Events.on "mouseup" (Decode.succeed DragEnded) ]
+
+                    Drag.Dragged ->
+                        []
                )
         )
         [ icon "gg-layout-grid-small" ]
