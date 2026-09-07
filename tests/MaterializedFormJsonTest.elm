@@ -3,14 +3,27 @@ module MaterializedFormJsonTest exposing (suite)
 {- Tests for the materialized (filled-in) form JSON codec.
 
 A materialized form is a FormToolkit.Field tree carrying user values. Its JSON
-is a nested object keyed by input names with scalar values:
+is a nested object keyed by input names with scalar values.
 
-  - Field.encodeValues : Field id -> Encode.Value
-  - Field.updateValuesFromJson : Encode.Value -> Field id -> Result (Error id) (Field id)
+The current codec is a pair of independent functions:
 
-Values are serialized by their string form and parsed back according to the
-input type, so typed values (int, float, bool, date, month, time) survive a
-round-trip.
+  - encode: Parse.json   : Parser id Json.Encode.Value
+  - decode: Field.updateValuesFromJson : Encode.Value -> Field id -> Result (Error id) (Field id)
+
+Values are serialized in typed form (numbers as numbers, dates/months/times as
+their canonical strings) and parsed back according to the input type, so typed
+values (int, float, bool, date, month, time) survive a round-trip.
+
+Note on structure: updateValuesFromJson resolves JSON keys against Field.name
+attributes walking the tree *below* the root, so every input under test is
+wrapped in an unnamed root group (as all real forms are; see the doc example
+on Field.updateValuesFromJson).
+
+Note on select and radio: Parse.json encodes the chosen option value, while
+updateValuesFromJson resolves incoming strings as option *indices* (the same
+path as user input events, whose DOM option values are indices). The two are
+therefore not inverses for those input types; select and radio are covered by
+encode-shape tests below instead of generic round-trips.
 -}
 
 import Expect
@@ -25,7 +38,7 @@ import Time
 suite : Test
 suite =
     describe "Materialized form JSON codec"
-        [ describe "round-trips every input variant"
+        [ describe "round-trips values through Parse.json and updateValuesFromJson"
             [ roundTrips "text" textInput (Value.string "hello")
             , roundTrips "textarea" textareaInput (Value.string "line1\nline2")
             , roundTrips "email" emailInput (Value.string "alice@example.com")
@@ -36,22 +49,40 @@ suite =
             , roundTrips "date" dateInput (Value.date (Time.millisToPosix 0))
             , roundTrips "month" monthInput (Value.month (Time.millisToPosix 0))
             , roundTrips "datetime" datetimeInput (Value.time (Time.millisToPosix 0))
-            , roundTrips "select" selectInput (Value.string "b")
-            , roundTrips "radio" radioInput (Value.string "a")
             , roundTrips "checkbox" checkboxInput (Value.bool True)
             ]
+        , describe "select and radio encode their chosen option value"
+            [ test "select" <|
+                \_ ->
+                    selectInput
+                        |> Parse.parse Parse.json
+                        |> Result.mapError (always "Parse.json failed")
+                        |> Result.andThen decodeValueField
+                        |> Expect.equal (Ok "b")
+            , test "radio" <|
+                \_ ->
+                    radioInput
+                        |> Parse.parse Parse.json
+                        |> Result.mapError (always "Parse.json failed")
+                        |> Result.andThen decodeValueField
+                        |> Expect.equal (Ok "a")
+            ]
         , describe "structure"
-            [ test "encodeValues produces name-keyed nested JSON" <|
+            [ test "Parse.json produces name-keyed nested JSON" <|
                 \_ ->
                     nestedForm
-                        |> Field.encodeValues
-                        |> Decode.decodeValue (Decode.at [ "user", "name" ] Decode.string)
+                        |> Parse.parse Parse.json
+                        |> Result.mapError (always "Parse.json failed")
+                        |> Result.andThen
+                            (Decode.decodeValue (Decode.at [ "user", "name" ] Decode.string)
+                                >> Result.mapError Decode.errorToString
+                            )
                         |> Expect.equal (Ok "Alice")
             , test "nested group values round-trip" <|
                 \_ ->
                     nestedForm
-                        |> Field.encodeValues
-                        |> (\json -> Field.updateValuesFromJson json blankNestedForm)
+                        |> Parse.parse Parse.json
+                        |> Result.andThen (\json -> Field.updateValuesFromJson json blankNestedForm)
                         |> Result.andThen
                             (Parse.parse
                                 (Parse.map2 Tuple.pair
@@ -64,13 +95,19 @@ suite =
         ]
 
 
+decodeValueField : Decode.Value -> Result String String
+decodeValueField json =
+    Decode.decodeValue (Decode.field "value" Decode.string) json
+        |> Result.mapError Decode.errorToString
+
+
 roundTrips : String -> Field.Field String -> Value -> Test
 roundTrips label field_ expected =
     test label <|
         \_ ->
-            field_
-                |> Field.encodeValues
-                |> (\json -> Field.updateValuesFromJson json field_)
+            Field.group [] [ field_ ]
+                |> Parse.parse Parse.json
+                |> Result.andThen (\json -> Field.updateValuesFromJson json (Field.group [] [ field_ ]))
                 |> Result.andThen (Parse.parse (Parse.field "id" Parse.value))
                 |> Expect.equal (Ok expected)
 

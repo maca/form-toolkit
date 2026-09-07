@@ -18,7 +18,6 @@ import Editor.Id as Id
 import Expect
 import FormToolkit.Value as Value
 import Json.Decode as Decode
-import Json.Encode as Encode
 import Test exposing (..)
 import Time
 

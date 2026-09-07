@@ -6,9 +6,11 @@ module Editor.Element exposing
     , checkbox
     , concatMap
     , date
+    , decode
     , drag
     , elementType
     , elements
+    , encode
     , foldl
     , group
     , groupPlaceholder
@@ -43,7 +45,8 @@ module Editor.Element exposing
 import Basics.Extra exposing (flip)
 import Editor.Drag as Drag exposing (Drag, Position(..))
 import Editor.Id as Id exposing (Id)
-import FormToolkit.Value as Value exposing (Value)
+import FormToolkit.Value as Value exposing (Value(..))
+import Internal.Value as InternalValue
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 import String.Extra as String
@@ -361,6 +364,9 @@ isGroup element =
         ElementGroup _ ->
             True
 
+        RepeatableGroup _ ->
+            True
+
         _ ->
             False
 
@@ -534,16 +540,13 @@ isPlaceholder element =
 -- CODEC
 
 
-decode : Element -> Encode.Value -> Result Decode.Error Element
-decode element _ =
-    Ok (open True element)
+{-| Serialize an element tree to JSON.
 
-
-decoder : Decoder Element
-decoder =
-    Decode.succeed (root [])
-
-
+`Blank` nodes encode to `Nothing` and are dropped from their parent's
+`fields` list. Runtime-only state (ids, drag state, collapsed/expanded) is not
+serialized: decoding assigns fresh ids (`Id.unset`), resets drag state
+(`Drag.idle`) and opens all groups, so a loaded form is fully expanded.
+-}
 encode : Element -> Maybe Encode.Value
 encode element =
     let
@@ -581,7 +584,7 @@ encode element =
                     , ( "label", encodeMaybeString attrs.label )
                     , ( "placeholder", encodeMaybeString attrs.placeholder )
                     , ( "help", encodeMaybeString attrs.help )
-                    , ( "hint", encodeMaybeString attrs.help )
+                    , ( "hint", encodeMaybeString attrs.hint )
                     , ( "required", Encode.bool attrs.isRequired )
                     ]
             in
@@ -653,6 +656,186 @@ encodeOptions =
                 , ( "label", Encode.string label_ )
                 ]
         )
+
+
+
+-- DECODER
+
+
+{-| Deserialize an element tree from the JSON produced by [encode](#encode).
+
+Decoded elements get `Id.unset` ids, `Drag.idle` drag state, and open groups.
+-}
+decode : Decoder Element
+decode =
+    Decode.field "type" Decode.string
+        |> Decode.andThen decodeByType
+
+
+decodeByType : String -> Decoder Element
+decodeByType typeName =
+    case typeName of
+        "group" ->
+            decodeGroup ElementGroup
+
+        "repeatable-group" ->
+            decodeGroup RepeatableGroup
+
+        "text" ->
+            decodeField TextField
+
+        "checkbox" ->
+            decodeField Checkbox
+
+        "integer" ->
+            decodeRange IntegerField InternalValue.intFromString
+
+        "date" ->
+            decodeRange DateField InternalValue.dateFromString
+
+        "month" ->
+            decodeRange MonthField InternalValue.monthFromString
+
+        "select" ->
+            decodeOptions Select
+
+        "radio" ->
+            decodeOptions Radio
+
+        "review" ->
+            Decode.map2
+                (\elName elText ->
+                    Review
+                        { id = Id.unset
+                        , name = elName
+                        , text = elText
+                        , drag = Drag.idle
+                        }
+                )
+                (maybeDecodeString "name")
+                (maybeDecodeString "text")
+
+        "help" ->
+            Decode.map3
+                (\elName elText button ->
+                    Help
+                        { id = Id.unset
+                        , name = elName
+                        , text = elText
+                        , button = button
+                        , drag = Drag.idle
+                        }
+                )
+                (maybeDecodeString "name")
+                (maybeDecodeString "text")
+                (maybeDecodeString "button")
+
+        other ->
+            Decode.fail ("Unsupported element type: " ++ other)
+
+
+decodeGroup : ({ id : Id, name : Maybe String, label : Maybe String, inline : Bool, elements : List Element, drag : Drag, isOpen : Bool } -> Element) -> Decoder Element
+decodeGroup constructor =
+    Decode.map4
+        (\elName elLabel inline children ->
+            constructor
+                { id = Id.unset
+                , name = elName
+                , label = elLabel
+                , inline = inline
+                , elements = children
+                , drag = Drag.idle
+                , isOpen = True
+                }
+        )
+        (maybeDecodeString "name")
+        (maybeDecodeString "label")
+        (Decode.field "inline" Decode.bool)
+        (Decode.field "fields" (Decode.lazy (\_ -> Decode.list decode)))
+
+
+
+type alias FieldAttrs =
+    { name : Maybe String
+    , label : Maybe String
+    , placeholder : Maybe String
+    , hint : Maybe String
+    , help : Maybe String
+    , isRequired : Bool
+    }
+
+
+fieldAttrsDecoder : Decoder FieldAttrs
+fieldAttrsDecoder =
+    Decode.map6 FieldAttrs
+        (maybeDecodeString "name")
+        (maybeDecodeString "label")
+        (maybeDecodeString "placeholder")
+        (maybeDecodeString "hint")
+        (maybeDecodeString "help")
+        (Decode.field "required" Decode.bool)
+
+
+fieldElementFrom : FieldAttrs -> Field -> Element
+fieldElementFrom attrs field =
+    FieldElement
+        { id = Id.unset
+        , field = field
+        , name = attrs.name
+        , label = attrs.label
+        , placeholder = attrs.placeholder
+        , hint = attrs.hint
+        , help = attrs.help
+        , isRequired = attrs.isRequired
+        , drag = Drag.idle
+        }
+
+
+decodeField : Field -> Decoder Element
+decodeField field =
+    Decode.map (\attrs -> fieldElementFrom attrs field) fieldAttrsDecoder
+
+
+decodeRange : ({ min : Value, max : Value } -> Field) -> (String -> InternalValue.Value) -> Decoder Element
+decodeRange fieldType fromString =
+    Decode.map2
+        (\attrs ( min, max ) ->
+            fieldElementFrom attrs (fieldType { min = min, max = max })
+        )
+        fieldAttrsDecoder
+        (Decode.map2 Tuple.pair
+            (rangeValueDecoder "min" fromString)
+            (rangeValueDecoder "max" fromString)
+        )
+
+
+rangeValueDecoder : String -> (String -> InternalValue.Value) -> Decoder Value
+rangeValueDecoder key fromString =
+    Decode.map (Value << fromString) (Decode.field key Decode.string)
+
+
+decodeOptions : (Options -> Field) -> Decoder Element
+decodeOptions fieldType =
+    Decode.map2
+        (\attrs options -> fieldElementFrom attrs (fieldType options))
+        fieldAttrsDecoder
+        optionsDecoder
+
+
+optionsDecoder : Decoder Options
+optionsDecoder =
+    Decode.field "options"
+        (Decode.list
+            (Decode.map2 Tuple.pair
+                (Decode.field "value" Decode.string)
+                (Decode.field "label" Decode.string)
+            )
+        )
+
+
+maybeDecodeString : String -> Decoder (Maybe String)
+maybeDecodeString key =
+    Decode.maybe (Decode.field key Decode.string)
 
 
 
