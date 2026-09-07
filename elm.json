@@ -5,6 +5,10 @@
     "license": "BSD-3-Clause",
     "version": "2.0.0",
     "exposed-modules": [
+        "Editor.Drag",
+        "Editor.Element",
+        "Editor.Id",
+        "EditorForm",
         "FormToolkit.Field",
         "FormToolkit.View",
         "FormToolkit.Parse",
@@ -22,6 +26,7 @@
         "elm/regex": "1.0.0 <= v < 2.0.0",
         "elm/time": "1.0.0 <= v < 2.0.0",
         "elm/url": "1.0.0 <= v < 2.0.0",
+        "elm-community/basics-extra": "4.1.0 <= v < 5.0.0",
         "elm-community/list-extra": "8.7.0 <= v < 9.0.0",
         "elm-community/string-extra": "4.0.1 <= v < 5.0.0",
         "maca/elm-rose-tree": "1.2.1 <= v < 2.0.0",

@@ -46,7 +46,6 @@ import Editor.Id as Id exposing (Id)
 import FormToolkit.Value as Value exposing (Value)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
-import Schema exposing (GroupParams)
 import String.Extra as String
 
 
