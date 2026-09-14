@@ -57,16 +57,12 @@ update msg form =
             let
                 newField = FormField.update fieldMsg form.field
                 updatedElement = parseElement form.element newField
-                _ = Debug.log "parseElement result" updatedElement
             in
             ( { form | field = newField, element = Result.withDefault form.element updatedElement }, updatedElement )
 
 
 view : EditorForm -> Html Msg
 view form =
-    let
-        _ = Debug.log "EditorForm.view element" form.element
-    in
     FormField.toHtml FieldMsg form.field
 
 
@@ -320,7 +316,6 @@ fromGroupElement params =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
-            , FormField.required True
             ]
         , FormField.select
             [ FormField.identifier InlineId
@@ -348,7 +343,6 @@ fromRepeatableGroupElement params =
             [ FormField.identifier LabelId
             , FormField.label "Label"
             , FormField.value (Value.string (Maybe.withDefault "" params.label))
-            , FormField.required True
             ]
         , FormField.select
             [ FormField.identifier InlineId

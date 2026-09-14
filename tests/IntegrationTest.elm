@@ -27,6 +27,7 @@ suite =
         , radioFieldTests
         , dateFieldTests
         , datetimeFieldTests
+        , integerFieldBoundsTests
         , repeatableFieldsTests
         , validationFocusBlurTests
         , validationTests
@@ -661,6 +662,132 @@ datetimeFieldTests =
                     |> Query.fromHtml
                     |> Query.find [ tag "input" ]
                     |> Query.has [ attribute (Attrs.attribute "value" "2024-01-01T12:00:00.000") ]
+        , test "required datetime left blank fails to parse instead of defaulting" <|
+            \_ ->
+                let
+                    datetimeField =
+                        Field.datetime
+                            [ Field.label "Last update"
+                            , Field.name "datetime-field"
+                            , Field.required True
+                            ]
+
+                    { result } =
+                        Interaction.init Parse.posix datetimeField
+                            |> fillInput "datetime-field" "2023-12-25T14:30"
+                            |> fillInput "datetime-field" ""
+                            |> blur "datetime-field"
+                in
+                case result of
+                    Err (Error.IsBlank _) ->
+                        Expect.pass
+
+                    other ->
+                        Expect.fail
+                            ("Expected blank required datetime to fail with IsBlank, got "
+                                ++ Debug.toString other
+                            )
+        , test "required blank datetime fails the app submit gate (Parse.succeed True)" <|
+            \_ ->
+                let
+                    datetimeField =
+                        Field.datetime
+                            [ Field.label "Last update"
+                            , Field.name "datetime-field"
+                            , Field.required True
+                            ]
+
+                    { result } =
+                        Interaction.init (Parse.succeed True) datetimeField
+                            |> fillInput "datetime-field" ""
+                            |> blur "datetime-field"
+                in
+                case result of
+                    Err (Error.IsBlank _) ->
+                        Expect.pass
+
+                    other ->
+                        Expect.fail
+                            ("Expected blank required datetime to block the submit gate with IsBlank, got "
+                                ++ Debug.toString other
+                            )
+        , test "non-required blank datetime does not fail the submit gate" <|
+            \_ ->
+                let
+                    datetimeField =
+                        Field.datetime
+                            [ Field.label "Last update"
+                            , Field.name "datetime-field"
+                            ]
+
+                    { result } =
+                        Interaction.init (Parse.succeed True) datetimeField
+                            |> fillInput "datetime-field" ""
+                            |> blur "datetime-field"
+                in
+                case result of
+                    Ok _ ->
+                        Expect.pass
+
+                    Err _ ->
+                        Expect.fail "Optional blank datetime should not block the submit gate"
+        ]
+
+
+integerFieldBoundsTests : Test
+integerFieldBoundsTests =
+    describe "integer field bounds" <|
+        [ test "unconstrained integer field renders without min/max attributes" <|
+            \_ ->
+                Field.int
+                    [ Field.label "Budget"
+                    , Field.name "budget-field"
+                    , Field.required True
+                    ]
+                    |> Field.toHtml (always never)
+                    |> Query.fromHtml
+                    |> Query.find [ tag "input" ]
+                    |> Expect.all
+                        [ Query.hasNot [ attribute (Attrs.attribute "min" "0") ]
+                        , Query.hasNot [ attribute (Attrs.attribute "max" "0") ]
+                        ]
+        , test "unconstrained integer field accepts an arbitrary nonzero value" <|
+            \_ ->
+                Field.int
+                    [ Field.name "budget-field" ]
+                    |> Interaction.init Parse.int
+                    |> fillInput "budget-field" "5"
+                    |> .result
+                    |> Expect.equal (Ok 5)
+        , test "unconstrained float field renders without min/max attributes" <|
+            \_ ->
+                Field.float
+                    [ Field.label "Price"
+                    , Field.name "price-field"
+                    , Field.required True
+                    ]
+                    |> Field.toHtml (always never)
+                    |> Query.fromHtml
+                    |> Query.find [ tag "input" ]
+                    |> Expect.all
+                        [ Query.hasNot [ attribute (Attrs.attribute "min" "0") ]
+                        , Query.hasNot [ attribute (Attrs.attribute "max" "0") ]
+                        ]
+        , test "integer field with explicit bounds renders those min/max attributes" <|
+            \_ ->
+                Field.int
+                    [ Field.label "Age"
+                    , Field.name "age-field"
+                    , Field.min (Value.int 0)
+                    , Field.max (Value.int 120)
+                    ]
+                    |> Field.toHtml (always never)
+                    |> Query.fromHtml
+                    |> Query.find [ tag "input" ]
+                    |> Expect.all
+                        [ Query.has [ attribute (Attrs.attribute "min" "0") ]
+                        , Query.has [ attribute (Attrs.attribute "max" "120") ]
+                        ]
         ]
 
 
