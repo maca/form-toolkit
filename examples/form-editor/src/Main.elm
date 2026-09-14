@@ -36,6 +36,7 @@ import Html.Events as Events
         , stopPropagationOn
         )
 import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 
 
 main : Program () Model Msg
@@ -575,7 +576,13 @@ view model =
 
                     JsonTab ->
                         [ div [ class "tab-pane" ]
-                            [ text "JSON content coming soon" ]
+                            [ case Element.encode model.element of
+                                Just json ->
+                                    Html.pre [] [ text (Encode.encode 2 json) ]
+
+                                Nothing ->
+                                    text "Nothing to serialize"
+                            ]
                         ]
                 )
             ]
