@@ -75,6 +75,34 @@ suite =
             \_ ->
                 Element.toField (repeatableGroupElement [])
                     |> Expect.equal Nothing
+        , test "one JSON materializes the builder and a usable form" <|
+            \_ ->
+                let
+                    json =
+                        """{"type":"group","inline":false,"name":"person","label":"Person","fields":[{"type":"text","name":"first_name","label":"First name","placeholder":null,"help":null,"hint":null,"required":false}]}"""
+                in
+                case Decode.decodeString Element.decode json of
+                    Err error ->
+                        Expect.fail (Decode.errorToString error)
+
+                    Ok element ->
+                        case Element.toField element of
+                            Nothing ->
+                                Expect.fail "expected a form"
+
+                            Just field ->
+                                Field.group [] [ field ]
+                                    |> Field.updateValuesFromJson
+                                        (Encode.object
+                                            [ ( "person", Encode.object [ ( "first_name", Encode.string "Frank" ) ] ) ]
+                                        )
+                                    |> Result.andThen (Parse.parse Parse.json)
+                                    |> Result.mapError (always "codec failed")
+                                    |> Result.andThen
+                                        (Decode.decodeValue (Decode.at [ "person", "first_name" ] Decode.string)
+                                            >> Result.mapError Decode.errorToString
+                                        )
+                                    |> Expect.equal (Ok "Frank")
         ]
 
 
