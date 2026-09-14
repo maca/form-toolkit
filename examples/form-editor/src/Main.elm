@@ -55,6 +55,8 @@ type alias Model =
     , dragAction : DragAction
     , editForm : EditorForm.EditorForm
     , activeTab : Tab
+    , jsonInput : String
+    , jsonError : Maybe String
     }
 
 
@@ -84,6 +86,8 @@ type Msg
     | ElementRemoved Id
     | FormMsg EditorForm.Msg
     | TabSwitched Tab
+    | JsonInputChanged String
+    | JsonImportClicked
     | NoOp
 
 
@@ -123,6 +127,8 @@ init =
     , dragAction = None
     , editForm = EditorForm.init (Element.root [])
     , activeTab = PreviewTab
+    , jsonInput = ""
+    , jsonError = Nothing
     }
 
 
@@ -216,6 +222,27 @@ update msg model =
 
         TabSwitched tab ->
             { model | activeTab = tab }
+
+        JsonInputChanged input ->
+            { model | jsonInput = input }
+
+        JsonImportClicked ->
+            case Decode.decodeString Element.decode model.jsonInput of
+                Ok decoded ->
+                    let
+                        ( nextId, importedElement ) =
+                            Element.updateIds (Id.fromInt 1) decoded
+                    in
+                    { model
+                        | element = importedElement
+                        , nextNode = nextId
+                        , selected = Nothing
+                        , editForm = EditorForm.init (Element.root [])
+                        , jsonError = Nothing
+                    }
+
+                Err error ->
+                    { model | jsonError = Just (Decode.errorToString error) }
 
         NoOp ->
             model
@@ -582,6 +609,20 @@ view model =
 
                                 Nothing ->
                                     text "Nothing to serialize"
+                            , Html.hr [] []
+                            , Html.textarea
+                                [ Attributes.value model.jsonInput
+                                , Events.onInput JsonInputChanged
+                                , Attributes.placeholder "Paste form JSON here to load it"
+                                ]
+                                []
+                            , button [ onClick JsonImportClicked ] [ text "Load" ]
+                            , case model.jsonError of
+                                Just error ->
+                                    div [ class "json-error" ] [ text error ]
+
+                                Nothing ->
+                                    text ""
                             ]
                         ]
                 )
