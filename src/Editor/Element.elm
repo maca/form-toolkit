@@ -35,6 +35,7 @@ module Editor.Element exposing
     , root
     , select
     , text
+    , toField
     , toggleOpen
     , updateDrag
     , updateIds
@@ -45,6 +46,7 @@ module Editor.Element exposing
 import Basics.Extra exposing (flip)
 import Editor.Drag as Drag exposing (Drag, Position(..))
 import Editor.Id as Id exposing (Id)
+import FormToolkit.Field as Field
 import FormToolkit.Value as Value exposing (Value(..))
 import Internal.Value as InternalValue
 import Json.Decode as Decode exposing (Decoder)
@@ -836,6 +838,122 @@ optionsDecoder =
 maybeDecodeString : String -> Decoder (Maybe String)
 maybeDecodeString key =
     Decode.maybe (Decode.field key Decode.string)
+
+
+
+-- MATERIALIZE
+
+
+{-| Materialize an element tree into a `FormToolkit.Field` form.
+
+Fields carry their `name` and `identifier` (the element `Id`), so the resulting
+form can be filled in, validated, and round-tripped through `Parse.json` /
+`Field.updateValuesFromJson`. Builder-only concerns (`help`, group `inline`,
+drag/open state) are not carried over. Repeatable groups become
+`Field.repeatable`. Empty groups and `Blank` placeholders materialize to
+`Nothing` and are dropped from their parent.
+-}
+toField : Element -> Maybe (Field.Field Id)
+toField element =
+    case element of
+        FieldElement params ->
+            Just (fieldElementToField params)
+
+        ElementGroup params ->
+            case List.filterMap toField params.elements of
+                [] ->
+                    Nothing
+
+                children ->
+                    Just (Field.group (groupAttributes params) children)
+
+        RepeatableGroup params ->
+            case List.filterMap toField params.elements of
+                [] ->
+                    Nothing
+
+                children ->
+                    Just (Field.repeatable (groupAttributes params) (Field.group [] children) [])
+
+        Review params ->
+            Just
+                (Field.textarea
+                    (maybeString params.name Field.name
+                        ++ [ Field.identifier params.id ]
+                        ++ maybeString params.text (Field.value << Value.string)
+                    )
+                )
+
+        Help params ->
+            Just
+                (Field.text
+                    (maybeString params.name Field.name
+                        ++ [ Field.identifier params.id ]
+                        ++ maybeString params.button Field.label
+                        ++ maybeString params.text (Field.value << Value.string)
+                    )
+                )
+
+        Blank _ ->
+            Nothing
+
+
+fieldElementToField : FieldParams -> Field.Field Id
+fieldElementToField params =
+    case params.field of
+        TextField ->
+            Field.text (fieldAttributes params)
+
+        Checkbox ->
+            Field.checkbox (fieldAttributes params)
+
+        IntegerField { min, max } ->
+            Field.int (fieldAttributes params ++ [ Field.min min, Field.max max ])
+
+        DateField { min, max } ->
+            Field.date (fieldAttributes params ++ [ Field.min min, Field.max max ])
+
+        MonthField { min, max } ->
+            Field.month (fieldAttributes params ++ [ Field.min min, Field.max max ])
+
+        Select options ->
+            Field.select (fieldAttributes params ++ [ Field.options (optionsToField options) ])
+
+        Radio options ->
+            Field.radio (fieldAttributes params ++ [ Field.options (optionsToField options) ])
+
+
+fieldAttributes : FieldParams -> List (Field.Attribute Id val)
+fieldAttributes params =
+    maybeString params.name Field.name
+        ++ maybeString params.label Field.label
+        ++ maybeString params.placeholder Field.placeholder
+        ++ maybeString params.hint Field.hint
+        ++ [ Field.identifier params.id, Field.required params.isRequired ]
+
+
+groupAttributes :
+    { a | name : Maybe String, label : Maybe String, id : Id }
+    -> List (Field.Attribute Id val)
+groupAttributes params =
+    maybeString params.name Field.name
+        ++ maybeString params.label Field.label
+        ++ [ Field.identifier params.id ]
+
+
+optionsToField : Options -> List ( String, Value )
+optionsToField =
+    List.map (\( val, label_ ) -> ( label_, Value.string val ))
+
+
+maybeString : Maybe String -> (String -> attr) -> List attr
+maybeString maybeValue toAttr =
+    case maybeValue of
+        Just string ->
+            [ toAttr string ]
+
+        Nothing ->
+            []
 
 
 
