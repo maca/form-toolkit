@@ -61,6 +61,7 @@ type alias Attributes id fieldType value status err =
     , removeFieldsButtonCopy : String
     , errors : err
     , classList : List String
+    , inline : Bool
     , selectionStart : Int
     , selectionEnd : Int
     , disabled : Bool
@@ -99,6 +100,7 @@ mapAttributes func errMapper typeMapper valueMapper statusMapper input =
     , removeFieldsButtonCopy = input.removeFieldsButtonCopy
     , errors = errMapper input.errors
     , classList = input.classList
+    , inline = input.inline
     , selectionStart = input.selectionStart
     , selectionEnd = input.selectionEnd
     , disabled = input.disabled

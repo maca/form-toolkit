@@ -12,7 +12,7 @@ module FormToolkit.Field exposing
     , options, stringOptions, min, max, step, autogrow
     , class, classList
     , disabled, hidden, noattr, pattern, accept
-    , copies, repeatableMin, repeatableMax
+    , inline, copies, repeatableMin, repeatableMax
     , updateAttribute, updateAttributes, updateWithId
     , updateValuesFromJson
     , map
@@ -50,7 +50,7 @@ their attributes, update, and render them.
 
 # Groups
 
-@docs copies, repeatableMin, repeatableMax
+@docs inline, copies, repeatableMin, repeatableMax
 
 
 # Update attributes
@@ -582,6 +582,7 @@ initAttributes fieldType =
         , removeFieldsButtonCopy = "Remove"
         , errors = []
         , classList = []
+        , inline = False
         , selectionStart = 0
         , selectionEnd = 0
         , disabled = False
@@ -938,6 +939,25 @@ accept mimeTypes =
 combineAttrs : Attribute id val -> Attribute id val -> Attribute id val
 combineAttrs (Attribute a) (Attribute b) =
     Attribute (b >> a)
+
+
+{-| Lays a group's fields out next to each other instead of stacked.
+
+The default markup inlines the layout styles and adds an `inline-fields` class,
+which can be overridden with `FormToolkit.View.customizeGroups`.
+
+    Field.group
+        [ Field.label "Name"
+        , Field.inline
+        ]
+        [ Field.text [ Field.label "First name" ]
+        , Field.text [ Field.label "Last name" ]
+        ]
+
+-}
+inline : Attribute id val
+inline =
+    Attribute (\field -> { field | inline = True })
 
 
 {-| Sets the text for the add and remove buttons in a repeatable field.

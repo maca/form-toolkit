@@ -18,6 +18,8 @@ import FormToolkit.Value as Value
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Test exposing (..)
+import Test.Html.Query as Query
+import Test.Html.Selector exposing (class)
 
 
 suite : Test
@@ -103,6 +105,29 @@ suite =
                                             >> Result.mapError Decode.errorToString
                                         )
                                     |> Expect.equal (Ok "Frank")
+        , test "an inline group renders its fields inline" <|
+            \_ ->
+                case Element.toField (groupElementWith { inline = True } [ textFieldElement ]) of
+                    Nothing ->
+                        Expect.fail "expected a group"
+
+                    Just field ->
+                        field
+                            |> Field.toHtml (always never)
+                            |> Query.fromHtml
+                            |> Query.find [ class "inline-fields" ]
+                            |> Query.has [ class "inline-fields" ]
+        , test "a stacked group does not render inline" <|
+            \_ ->
+                case Element.toField (groupElement [ textFieldElement ]) of
+                    Nothing ->
+                        Expect.fail "expected a group"
+
+                    Just field ->
+                        field
+                            |> Field.toHtml (always never)
+                            |> Query.fromHtml
+                            |> Query.hasNot [ class "inline-fields" ]
         ]
 
 
@@ -127,11 +152,16 @@ textFieldElement =
 
 groupElement : List Element -> Element
 groupElement elements =
+    groupElementWith { inline = False } elements
+
+
+groupElementWith : { inline : Bool } -> List Element -> Element
+groupElementWith { inline } elements =
     ElementGroup
         { id = Id.fromInt 2
         , name = Just "person"
         , label = Just "Person"
-        , inline = False
+        , inline = inline
         , elements = elements
         , drag = Drag.idle
         , isOpen = True

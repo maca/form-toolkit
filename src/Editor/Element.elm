@@ -848,10 +848,11 @@ maybeDecodeString key =
 
 Fields carry their `name` and `identifier` (the element `Id`), so the resulting
 form can be filled in, validated, and round-tripped through `Parse.json` /
-`Field.updateValuesFromJson`. Builder-only concerns (`help`, group `inline`,
-drag/open state) are not carried over. Repeatable groups become
-`Field.repeatable`. Empty groups and `Blank` placeholders materialize to
-`Nothing` and are dropped from their parent.
+`Field.updateValuesFromJson`. A group's `inline` format is carried over, and
+builder-only concerns (`help`, drag/open state) are not. Repeatable groups
+become `Field.repeatable`, with `inline` applied to the repeated group. Empty
+groups and `Blank` placeholders materialize to `Nothing` and are dropped from
+their parent.
 -}
 toField : Element -> Maybe (Field.Field Id)
 toField element =
@@ -865,7 +866,7 @@ toField element =
                     Nothing
 
                 children ->
-                    Just (Field.group (groupAttributes params) children)
+                    Just (Field.group (groupAttributes params ++ inlineAttributes params) children)
 
         RepeatableGroup params ->
             case List.filterMap toField params.elements of
@@ -873,7 +874,7 @@ toField element =
                     Nothing
 
                 children ->
-                    Just (Field.repeatable (groupAttributes params) (Field.group [] children) [])
+                    Just (Field.repeatable (groupAttributes params) (Field.group (inlineAttributes params) children) [])
 
         Review params ->
             Just
@@ -939,6 +940,17 @@ groupAttributes params =
     maybeString params.name Field.name
         ++ maybeString params.label Field.label
         ++ [ Field.identifier params.id ]
+
+
+{-| Carry the builder's group format over to the rendered form.
+-}
+inlineAttributes : { a | inline : Bool } -> List (Field.Attribute Id val)
+inlineAttributes params =
+    if params.inline then
+        [ Field.inline ]
+
+    else
+        []
 
 
 optionsToField : Options -> List ( String, Value )

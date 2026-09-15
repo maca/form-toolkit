@@ -88,6 +88,7 @@ type alias FieldAttributes id =
     , removeFieldsButtonCopy : String
     , errors : List (Error id)
     , classList : List String
+    , inline : Bool
     , selectionStart : Int
     , selectionEnd : Int
     , disabled : Bool
@@ -377,13 +378,26 @@ customizeGroups :
      , identifier : Maybe id
      , errors : List String
      , class : String
+     , inline : Bool
      }
      -> Html msg
     )
     -> View id msg
     -> View id msg
 customizeGroups viewFunc (View view) =
-    View { view | groupView = viewFunc }
+    View
+        { view
+            | groupView =
+                \params ->
+                    viewFunc
+                        { legendText = params.legendText
+                        , fields = params.fields
+                        , identifier = params.identifier
+                        , errors = params.errors
+                        , class = params.class
+                        , inline = params.inline
+                        }
+        }
 
 
 {-| Customize the positioning, and appearance of each of the inputs of a repeatable

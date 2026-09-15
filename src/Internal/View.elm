@@ -62,6 +62,7 @@ type alias GroupView id msg =
     , identifier : Maybe id
     , errors : List String
     , class : String
+    , inline : Bool
     }
 
 
@@ -250,7 +251,7 @@ labelToHtml label path input element =
 groupToHtml : View id msg -> Html msg
 groupToHtml view =
     let
-        ({ identifier, label, classList } as attrs) =
+        ({ identifier, label, classList, inline } as attrs) =
             Tree.value view.root
     in
     view.groupView
@@ -280,6 +281,7 @@ groupToHtml view =
         , identifier = identifier
         , errors = visibleErrors view.root |> List.map (view.errorToString attrs)
         , class = String.join " " classList
+        , inline = inline
         }
 
 
@@ -772,7 +774,7 @@ visibleErrors input =
 
 
 groupView : GroupView id msg -> Html msg
-groupView { fields, legendText, errors, class } =
+groupView { fields, legendText, errors, class, inline } =
     Html.fieldset
         [ Attributes.class class ]
         (List.concat
@@ -783,10 +785,32 @@ groupView { fields, legendText, errors, class } =
                 Nothing ->
                     Html.text ""
               )
-                :: fields
+                :: fieldsHtml inline fields
             , [ viewErrors errors ]
             ]
         )
+
+
+{-| Inline groups put their fields side by side with styles inlined in the
+markup, plus an `inline-fields` class as an override hook.
+-}
+fieldsHtml : Bool -> List (Html msg) -> List (Html msg)
+fieldsHtml inline fields =
+    if inline then
+        [ Html.div
+            (Attributes.class "inline-fields"
+                :: List.map (\( key, value ) -> Attributes.style key value)
+                    [ ( "display", "grid" )
+                    , ( "grid-template-columns", "repeat(auto-fit, minmax(min(10rem, 100%), 1fr))" )
+                    , ( "gap", "1rem" )
+                    , ( "align-items", "start" )
+                    ]
+            )
+            fields
+        ]
+
+    else
+        fields
 
 
 repeatableFieldsGroupView : RepeatableFieldsGroupView id msg -> Html msg

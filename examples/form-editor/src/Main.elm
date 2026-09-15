@@ -497,7 +497,7 @@ buildPreviewField element =
                 Nothing
 
             else
-                Just (Field.group [ Field.label (params.label |> Maybe.withDefault "") ] children)
+                Just (Field.group (previewGroupAttributes params) children)
 
         RepeatableGroup params ->
             let
@@ -508,7 +508,7 @@ buildPreviewField element =
                 Nothing
 
             else
-                Just (Field.group [ Field.label (params.label |> Maybe.withDefault "") ] children)
+                Just (Field.group (previewGroupAttributes params) children)
 
         Review params ->
             Just
@@ -530,6 +530,17 @@ buildPreviewField element =
 
         Blank _ ->
             Nothing
+
+
+previewGroupAttributes : { a | name : Maybe String, label : Maybe String, inline : Bool } -> List (Field.Attribute PreviewId val)
+previewGroupAttributes params =
+    Field.label (params.label |> Maybe.withDefault "")
+        :: (if params.inline then
+                [ Field.inline ]
+
+            else
+                []
+           )
 
 
 view : Model -> Html Msg

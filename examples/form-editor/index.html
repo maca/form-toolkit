@@ -550,26 +550,38 @@
       box-shadow: 0px 0px 0px 3px rgba(155,77,202,1) inset;
     }
 
-    .schema-editor-tree .placeholder, .drag-dragged > * {
+    /* painted over the node's box so the placeholder keeps the node's height */
+    .schema-editor-tree .placeholder {
       height: 40px;
       border: 3px dashed rgba(0, 0, 0, 0.1);
+    }
+
+    .drag-dragged > * {
+      position: relative;
+    }
+
+    .drag-dragged > *::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 3px dashed rgba(0, 0, 0, 0.1);
+      border-radius: inherit;
+      pointer-events: none;
     }
 
     .drag-dragged > * > * {
       transform: translateX(-9999px);
     }
 
+    /* margin, not padding: the border box is what the browser snapshots as the
+       drag image, so it must wrap the node exactly */
     .schema-editor .element {
-      padding: 0 0 var(--element-spacing) 0;
+      margin-bottom: var(--element-spacing);
     }
 
     .schema-editor .element > * {
       border-radius: var(--element-border-radius);
       display: flex;
-    }
-
-    .schema-editor .group .element > * {
-      margin-right: 2rem;
     }
 
     .schema-editor .field-icon {
@@ -659,6 +671,10 @@
       width: 100% !important;
       display: flex;
       flex-wrap: wrap;
+      /* base rule sets column direction, which would stack the wrapped lines */
+      flex-direction: row;
+      align-items: flex-start;
+      column-gap: 2rem;
     }
 
     .schema-editor .group-fields.inline > .element {
@@ -695,7 +711,10 @@
     .group-fields {
       display: flex;
       flex-direction: column;
-      padding-left: 2rem;
+      /* inset on the container, not the children: a child margin would make the
+         element's border box wider than the field, which the drag image picks up */
+      padding: 0 2rem;
+      box-sizing: border-box;
     }
 
     /* FormToolkit field styling - vertically stacked */
