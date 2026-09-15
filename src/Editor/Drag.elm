@@ -1,4 +1,22 @@
-module Editor.Drag exposing (Drag(..), Position(..), idle, positionDecoder)
+module Editor.Drag exposing
+    ( Drag(..), idle
+    , Position(..), positionDecoder
+    )
+
+{-| Per-node drag state for the form builder, and where a drop lands relative to
+its target.
+
+
+# Drag state
+
+@docs Drag, idle
+
+
+# Drop position
+
+@docs Position, positionDecoder
+
+-}
 
 import Json.Decode as Decode exposing (Decoder)
 

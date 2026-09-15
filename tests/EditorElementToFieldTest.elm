@@ -1,11 +1,11 @@
 module EditorElementToFieldTest exposing (suite)
 
 {- Tests for Editor.Element.toField: materializing an element tree into a
-usable FormToolkit.Field.
+   usable FormToolkit.Field.
 
-The key property is that materialized fields carry their `name` (and the
-element `Id` as identifier), so the resulting form can be filled and
-round-tripped through the values codec (Parse.json / Field.updateValuesFromJson).
+   The key property is that materialized fields carry their `name` (and the
+   element `Id` as identifier), so the resulting form can be filled and
+   round-tripped through the values codec (Parse.json / Field.updateValuesFromJson).
 -}
 
 import Editor.Drag as Drag
@@ -14,7 +14,6 @@ import Editor.Id as Id
 import Expect
 import FormToolkit.Field as Field
 import FormToolkit.Parse as Parse
-import FormToolkit.Value as Value
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Test exposing (..)

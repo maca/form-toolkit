@@ -1,4 +1,14 @@
-module Editor.Id exposing (Id, fromInt, increment, toIdentifier, unset)
+module Editor.Id exposing (Id, unset, fromInt, increment, toIdentifier)
+
+{-| Identifiers for the form builder's nodes: fresh ids for new nodes, and the
+DOM id derived from one.
+
+
+# Identifiers
+
+@docs Id, unset, fromInt, increment, toIdentifier
+
+-}
 
 import String.Extra as String
 

@@ -1,50 +1,64 @@
 module Editor.Element exposing
-    ( Element(..)
-    , Field(..)
-    , FieldParams
-    , Options
-    , checkbox
-    , concatMap
-    , date
-    , decode
-    , drag
-    , elementType
-    , elements
-    , encode
-    , foldl
-    , group
-    , groupPlaceholder
-    , help
-    , icon
-    , id
-    , identifier
-    , integer
-    , isEmptyGroup
-    , isGroup
-    , isPlaceholder
-    , label
-    , map
-    , month
-    , name
-    , open
-    , placeholder
-    , prepend
-    , radio
-    , repeatableGroup
-    , review
-    , root
-    , select
-    , text
+    ( Element(..), Field(..), FieldParams, Options
+    , root, text, checkbox, integer, date, month, select, radio, review, help, group, repeatableGroup
+    , placeholder, groupPlaceholder
+    , id, identifier, name, label, icon, elementType, drag, elements
+    , isEmptyGroup, isGroup, isPlaceholder
+    , withId, open, toggleOpen, updateDrag, updateIds, updateIdsFoldFn
+    , map, concatMap, foldl, prepend
+    , encode, decode
     , toField
-    , toggleOpen
-    , updateDrag
-    , updateIds
-    , updateIdsFoldFn
-    , withId
     )
 
+{-| The form builder's element tree: the fields and groups the drag-and-drop
+editor manipulates, its JSON codec, and materialization into a
+`FormToolkit.Field` form.
+
+
+# Element tree
+
+@docs Element, Field, FieldParams, Options
+
+
+# Field and group constructors
+
+@docs root, text, checkbox, integer, date, month, select, radio, review, help, group, repeatableGroup
+
+
+# Placeholders
+
+@docs placeholder, groupPlaceholder
+
+
+# Reading an element
+
+@docs id, identifier, name, label, icon, elementType, drag, elements
+@docs isEmptyGroup, isGroup, isPlaceholder
+
+
+# Updating an element
+
+@docs withId, open, toggleOpen, updateDrag, updateIds, updateIdsFoldFn
+
+
+# Tree traversal
+
+@docs map, concatMap, foldl, prepend
+
+
+# Serialization
+
+@docs encode, decode
+
+
+# Materialization
+
+@docs toField
+
+-}
+
 import Basics.Extra exposing (flip)
-import Editor.Drag as Drag exposing (Drag, Position(..))
+import Editor.Drag as Drag exposing (Drag)
 import Editor.Id as Id exposing (Id)
 import FormToolkit.Field as Field
 import FormToolkit.Value as Value exposing (Value(..))
@@ -351,10 +365,10 @@ isEmptyGroup : Element -> Bool
 isEmptyGroup element =
     case element of
         ElementGroup params ->
-            params.elements == []
+            List.isEmpty params.elements
 
         RepeatableGroup params ->
-            params.elements == []
+            List.isEmpty params.elements
 
         _ ->
             False
@@ -548,6 +562,7 @@ isPlaceholder element =
 `fields` list. Runtime-only state (ids, drag state, collapsed/expanded) is not
 serialized: decoding assigns fresh ids (`Id.unset`), resets drag state
 (`Drag.idle`) and opens all groups, so a loaded form is fully expanded.
+
 -}
 encode : Element -> Maybe Encode.Value
 encode element =
@@ -667,6 +682,7 @@ encodeOptions =
 {-| Deserialize an element tree from the JSON produced by [encode](#encode).
 
 Decoded elements get `Id.unset` ids, `Drag.idle` drag state, and open groups.
+
 -}
 decode : Decoder Element
 decode =
@@ -754,7 +770,6 @@ decodeGroup constructor =
         (maybeDecodeString "label")
         (Decode.field "inline" Decode.bool)
         (Decode.field "fields" (Decode.lazy (\_ -> Decode.list decode)))
-
 
 
 type alias FieldAttrs =
@@ -853,6 +868,7 @@ builder-only concerns (`help`, drag/open state) are not. Repeatable groups
 become `Field.repeatable`, with `inline` applied to the repeated group. Empty
 groups and `Blank` placeholders materialize to `Nothing` and are dropped from
 their parent.
+
 -}
 toField : Element -> Maybe (Field.Field Id)
 toField element =

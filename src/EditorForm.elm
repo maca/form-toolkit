@@ -1,8 +1,19 @@
-module EditorForm exposing (EditorForm, Msg, init, isValid, update, view)
+module EditorForm exposing (EditorForm, init, isValid, update, view, Msg)
+
+{-| The property editor for the element selected in the builder. Each editable
+property is a `FormToolkit.Field`, and every change is parsed back into an
+updated element.
+
+
+# Editor form
+
+@docs EditorForm, init, isValid, update, view, Msg
+
+-}
 
 import Editor.Element as Element exposing (Element(..), Field(..))
-import FormToolkit.Field as FormField exposing (Field)
 import FormToolkit.Error exposing (Error)
+import FormToolkit.Field as FormField exposing (Field)
 import FormToolkit.Parse as Parse
 import FormToolkit.Value as Value exposing (Value)
 import Html exposing (Html)
@@ -55,8 +66,11 @@ update msg form =
     case msg of
         FieldMsg fieldMsg ->
             let
-                newField = FormField.update fieldMsg form.field
-                updatedElement = parseElement form.element newField
+                newField =
+                    FormField.update fieldMsg form.field
+
+                updatedElement =
+                    parseElement form.element newField
             in
             ( { form | field = newField, element = Result.withDefault form.element updatedElement }, updatedElement )
 
@@ -529,14 +543,6 @@ parseFieldType fieldType field =
 
         _ ->
             fieldType
-
-
-getStringValue : FieldId -> Field FieldId -> String -> String
-getStringValue id field default =
-    Parse.parse (Parse.field id (Parse.maybe Parse.string)) field
-        |> Result.toMaybe
-        |> Maybe.andThen identity
-        |> Maybe.withDefault default
 
 
 getBoolValue : FieldId -> Field FieldId -> Bool -> Bool

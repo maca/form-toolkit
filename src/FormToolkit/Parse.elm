@@ -257,11 +257,9 @@ This parser only succeeds if the input is of type 'file' and a file has been
 uploaded.
 
     import FormToolkit.Field as Field
-    import File
 
     Field.file [ Field.required True ]
         |> parse file
-        --> Ok fileValue
 
 -}
 file : Parser id File.File
