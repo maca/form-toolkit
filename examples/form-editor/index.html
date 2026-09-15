@@ -460,6 +460,7 @@
     .schema-editor {
       --element-border-radius: 0.5rem;
       --element-spacing: 1rem;
+      --element-height: 44px;
       --step-separation: calc(var(--element-spacing) * 2.5);
       user-select: none;
       flex: 1;
@@ -550,14 +551,22 @@
       box-shadow: 0px 0px 0px 3px rgba(155,77,202,1) inset;
     }
 
-    /* painted over the node's box so the placeholder keeps the node's height */
+    /* the drop slot is as tall as the row it stands in for, so rows below it
+       don't shift when the placeholder becomes the element */
     .schema-editor-tree .placeholder {
-      height: 40px;
+      height: var(--element-height);
+      box-sizing: border-box;
       border: 3px dashed rgba(0, 0, 0, 0.1);
     }
 
+    /* the dragged node keeps its content visible but dimmed, so the drop reads as
+       an opacity change instead of content disappearing and reappearing */
     .drag-dragged > * {
       position: relative;
+    }
+
+    .drag-dragged > * > * {
+      opacity: 0.4;
     }
 
     .drag-dragged > *::after {
@@ -567,10 +576,6 @@
       border: 3px dashed rgba(0, 0, 0, 0.1);
       border-radius: inherit;
       pointer-events: none;
-    }
-
-    .drag-dragged > * > * {
-      transform: translateX(-9999px);
     }
 
     /* margin, not padding: the border box is what the browser snapshots as the
@@ -615,7 +620,7 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      min-height: 44px;
+      min-height: var(--element-height);
     }
 
     .schema-editor .group > .drag-handle,
@@ -636,7 +641,7 @@
 
     .schema-editor .editor-add .drag-handle {
       padding: 0 1rem;
-      min-height: 44px;
+      min-height: var(--element-height);
     }
 
     .schema-editor .field,
