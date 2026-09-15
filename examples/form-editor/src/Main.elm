@@ -289,7 +289,10 @@ draggedOver : Bool -> Id -> Position -> Maybe Element -> Element -> Element
 draggedOver isTopLevel id position dragged editorRoot =
     let
         mapFunc =
-            draggedOverHelp id position
+            draggedOverHelp
+                (dragged |> Maybe.map descendantIds |> Maybe.withDefault [])
+                id
+                position
     in
     case dragged of
         Just element ->
@@ -305,9 +308,21 @@ draggedOver isTopLevel id position dragged editorRoot =
             editorRoot
 
 
-draggedOverHelp : Id -> Position -> Maybe Element -> Element -> List Element
-draggedOverHelp containerId position placeholder element =
-    if Element.id element == containerId then
+{-| Dropping a node inside itself would remove it.
+-}
+descendantIds : Element -> List Id
+descendantIds element =
+    List.concatMap
+        (\child -> Element.id child :: descendantIds child)
+        (Element.elements element)
+
+
+draggedOverHelp : List Id -> Id -> Position -> Maybe Element -> Element -> List Element
+draggedOverHelp invalidTargets containerId position placeholder element =
+    if List.member (Element.id element) invalidTargets then
+        [ element ]
+
+    else if Element.id element == containerId then
         if Element.isPlaceholder element then
             [ element ]
 
