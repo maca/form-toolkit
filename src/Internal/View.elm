@@ -614,6 +614,10 @@ checkboxToHtml view =
                                 |> Maybe.withDefault (Attributes.class "")
                            )
                         :: Events.onCheck (view.onCheck identifier view.path)
+                        :: Events.on "click"
+                            (Json.Decode.map (view.onCheck identifier view.path)
+                                (Json.Decode.at [ "target", "checked" ] Json.Decode.bool)
+                            )
                         :: textInputHtmlAttributes view
                     , element
                     ]
