@@ -28,7 +28,8 @@ import NoUnused.Parameters
 import NoUnused.Patterns
 import NoUnused.Variables
 import Review.Documentation.CodeSnippet
-import Review.Rule as Rule exposing (Rule)
+import Review.NoCatchAllInCodec
+import Review.Rule exposing (Rule)
 import Simplify
 
 
@@ -39,7 +40,7 @@ config =
     , Docs.UpToDateReadmeLinks.rule
     , NoDebug.Log.rule
     , Review.Documentation.CodeSnippet.checkImplicitlyImportingEverythingFromCurrentModule
-    , NoDebug.TodoOrToString.rule |> Rule.ignoreErrorsForDirectories [ "tests/" ]
+    , NoDebug.TodoOrToString.rule
     , NoExposingEverything.rule
     , NoMissingTypeAnnotation.rule
     , NoSimpleLetBody.rule
@@ -52,4 +53,10 @@ config =
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
     , Simplify.rule Simplify.defaults
+    , Review.NoCatchAllInCodec.rule
+        [ "encodeAttribute"
+        , "fieldAttributeOf"
+        , "groupAttributeOf"
+        , "repeatableAttributeOf"
+        ]
     ]

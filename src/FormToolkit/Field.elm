@@ -15,6 +15,7 @@ module FormToolkit.Field exposing
     , inline, copies, repeatableMin, repeatableMax
     , updateAttribute, updateAttributes, updateWithId
     , updateValuesFromJson
+    , load
     , map
     , validate, touch
     )
@@ -59,6 +60,11 @@ their attributes, update, and render them.
 @docs updateValuesFromJson
 
 
+# Serialization
+
+@docs load
+
+
 # Mapping and composition
 
 @docs map
@@ -75,6 +81,7 @@ import File exposing (File)
 import FormToolkit.Error exposing (Error(..))
 import FormToolkit.Value as Value
 import Html exposing (Html)
+import Internal.Editor.Element as Element
 import Internal.Field exposing (FieldType(..), Status(..))
 import Internal.Utils
 import Internal.Value
@@ -1138,6 +1145,252 @@ updateValuesFromJson jsonValue (Field field) =
                 (Ok field)
             )
         |> Result.map (validateTree >> Field)
+
+
+{-| Loads a form from the JSON produced by `FormToolkit.Editor.save`.
+
+The JSON is the editor's canonical schema, and this materializes it into a
+fillable `Field`. Fields keep their [name](#name) so a loaded form can be
+filled with [updateValuesFromJson](#updateValuesFromJson); the schema carries
+no identifiers, so the loaded form has none and the `id` type stays open.
+Empty groups and placeholders are dropped, so a form with nothing to fill in
+is reported as an error.
+
+-}
+load : Encode.Value -> Result (Error id) (Field id)
+load json =
+    Decode.decodeValue Element.decode json
+        |> Result.mapError (Decode.errorToString >> CustomError Nothing)
+        |> Result.andThen
+            (\element ->
+                case materialize element of
+                    Just field ->
+                        Ok field
+
+                    Nothing ->
+                        Err (CustomError Nothing "The JSON describes no fields")
+            )
+
+
+
+-- MATERIALIZE
+
+
+{-| Turns an editor element tree into a fillable form. Fields keep their
+`name` as the form field name; empty groups and placeholders are dropped, so
+a tree with nothing to fill in gives `Nothing`.
+-}
+materialize : Element.Element -> Maybe (Field id)
+materialize element =
+    case element of
+        Element.FieldElement params ->
+            Just (fieldElementToField params)
+
+        Element.ElementGroup params ->
+            case List.filterMap materialize params.elements of
+                [] ->
+                    Nothing
+
+                children ->
+                    Just (group (groupAttributes params) children)
+
+        Element.RepeatableGroup params ->
+            case List.filterMap materialize params.elements of
+                [] ->
+                    Nothing
+
+                children ->
+                    Just
+                        (repeatable
+                            (repeatableAttributes params)
+                            (group (inlineMaterialized params.attributes) children)
+                            []
+                        )
+
+        Element.Review params ->
+            Just
+                (textarea
+                    (materializedAttribute params.attributes Element.nameAttribute name
+                        ++ materializedAttribute params.attributes Element.textAttribute (value << Value.string)
+                    )
+                )
+
+        Element.Help params ->
+            Just
+                (text
+                    (materializedAttribute params.attributes Element.nameAttribute name
+                        ++ materializedAttribute params.attributes Element.buttonAttribute label
+                        ++ materializedAttribute params.attributes Element.textAttribute (value << Value.string)
+                    )
+                )
+
+        Element.Blank _ ->
+            Nothing
+
+
+materializedAttribute :
+    List Element.Attribute
+    -> (List Element.Attribute -> Maybe String)
+    -> (String -> Attribute id val)
+    -> List (Attribute id val)
+materializedAttribute attributes getter toAttribute =
+    case getter attributes of
+        Just attrValue ->
+            [ toAttribute attrValue ]
+
+        Nothing ->
+            []
+
+
+fieldElementToField : Element.FieldParams -> Field id
+fieldElementToField params =
+    case params.field of
+        Element.TextField ->
+            text (fieldAttributes params)
+
+        Element.Checkbox ->
+            checkbox (fieldAttributes params)
+
+        Element.IntegerField range ->
+            int (fieldAttributes params ++ [ min range.min, max range.max ])
+
+        Element.DateField range ->
+            date (fieldAttributes params ++ [ min range.min, max range.max ])
+
+        Element.MonthField range ->
+            month (fieldAttributes params ++ [ min range.min, max range.max ])
+
+        Element.Select opts ->
+            select (fieldAttributes params ++ [ options (optionsToField opts) ])
+
+        Element.Radio opts ->
+            radio (fieldAttributes params ++ [ options (optionsToField opts) ])
+
+
+fieldAttributes : Element.FieldParams -> List (Attribute id val)
+fieldAttributes params =
+    List.concatMap fieldAttributeOf params.attributes
+        ++ [ required (Element.requiredAttribute params.attributes) ]
+
+
+fieldAttributeOf : Element.Attribute -> List (Attribute id val)
+fieldAttributeOf attr =
+    case attr of
+        Element.Name s ->
+            [ name s ]
+
+        Element.Label s ->
+            [ label s ]
+
+        Element.Placeholder s ->
+            [ placeholder s ]
+
+        Element.Hint s ->
+            [ hint s ]
+
+        Element.Required _ ->
+            []
+
+        Element.Inline _ ->
+            []
+
+        Element.HelpText _ ->
+            []
+
+        Element.Text _ ->
+            []
+
+        Element.Button _ ->
+            []
+
+
+groupAttributes : { a | attributes : List Element.Attribute } -> List (Attribute id val)
+groupAttributes params =
+    List.concatMap groupAttributeOf params.attributes
+
+
+groupAttributeOf : Element.Attribute -> List (Attribute id val)
+groupAttributeOf attr =
+    case attr of
+        Element.Name s ->
+            [ name s ]
+
+        Element.Label s ->
+            [ label s ]
+
+        Element.Inline True ->
+            [ inline ]
+
+        Element.Inline False ->
+            []
+
+        Element.Placeholder _ ->
+            []
+
+        Element.Hint _ ->
+            []
+
+        Element.Required _ ->
+            []
+
+        Element.HelpText _ ->
+            []
+
+        Element.Text _ ->
+            []
+
+        Element.Button _ ->
+            []
+
+
+repeatableAttributes : { a | attributes : List Element.Attribute } -> List (Attribute id val)
+repeatableAttributes params =
+    List.concatMap repeatableAttributeOf params.attributes
+
+
+repeatableAttributeOf : Element.Attribute -> List (Attribute id val)
+repeatableAttributeOf attr =
+    case attr of
+        Element.Name s ->
+            [ name s ]
+
+        Element.Label s ->
+            [ label s ]
+
+        Element.Inline _ ->
+            []
+
+        Element.Placeholder _ ->
+            []
+
+        Element.Hint _ ->
+            []
+
+        Element.Required _ ->
+            []
+
+        Element.HelpText _ ->
+            []
+
+        Element.Text _ ->
+            []
+
+        Element.Button _ ->
+            []
+
+
+inlineMaterialized : List Element.Attribute -> List (Attribute id val)
+inlineMaterialized attributes =
+    if Element.inlineAttribute attributes then
+        [ inline ]
+
+    else
+        []
+
+
+optionsToField : Element.Options -> List ( String, Value.Value )
+optionsToField =
+    List.map (\( val, label_ ) -> ( label_, Value.string val ))
 
 
 valueToPathLists : Encode.Value -> Result (Error id) (List ( String, String ))

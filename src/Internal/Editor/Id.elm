@@ -1,4 +1,4 @@
-module Editor.Id exposing (Id, unset, fromInt, increment, toIdentifier)
+module Internal.Editor.Id exposing (Id, unset, fromInt, increment, toIdentifier)
 
 {-| Identifiers for the form builder's nodes: fresh ids for new nodes, and the
 DOM id derived from one.

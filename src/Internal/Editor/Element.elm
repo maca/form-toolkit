@@ -1,18 +1,21 @@
-module Editor.Element exposing
+module Internal.Editor.Element exposing
     ( Element(..), Field(..), FieldParams, Options
-    , root, text, checkbox, integer, date, month, select, radio, review, help, group, repeatableGroup
+    , Attribute(..)
+    , nameAttribute, labelAttribute, placeholderAttribute, hintAttribute, helpTextAttribute
+    , buttonAttribute, textAttribute, requiredAttribute, inlineAttribute
+    , root, text, checkbox, integer, date, month, select, radio, group, repeatableGroup
     , placeholder, groupPlaceholder
-    , id, identifier, name, label, icon, elementType, drag, elements
+    , id, identifier, label, icon, elementType, drag, elements
     , isEmptyGroup, isGroup, isPlaceholder
-    , withId, open, toggleOpen, updateDrag, updateIds, updateIdsFoldFn
+    , withId, open, toggleOpen, updateDrag, updateIds
     , map, concatMap, foldl, prepend
     , encode, decode
-    , toField
     )
 
 {-| The form builder's element tree: the fields and groups the drag-and-drop
-editor manipulates, its JSON codec, and materialization into a
-`FormToolkit.Field` form.
+editor manipulates and its JSON codec. This is the canonical schema the
+`FormToolkit.Field` form is materialized from, not the other way around, so
+this module does not depend on `FormToolkit.Field`.
 
 
 # Element tree
@@ -20,9 +23,16 @@ editor manipulates, its JSON codec, and materialization into a
 @docs Element, Field, FieldParams, Options
 
 
+# Attributes
+
+@docs Attribute
+@docs nameAttribute, labelAttribute, placeholderAttribute, hintAttribute, helpTextAttribute
+@docs buttonAttribute, textAttribute, requiredAttribute, inlineAttribute
+
+
 # Field and group constructors
 
-@docs root, text, checkbox, integer, date, month, select, radio, review, help, group, repeatableGroup
+@docs root, text, checkbox, integer, date, month, select, radio, group, repeatableGroup
 
 
 # Placeholders
@@ -32,13 +42,13 @@ editor manipulates, its JSON codec, and materialization into a
 
 # Reading an element
 
-@docs id, identifier, name, label, icon, elementType, drag, elements
+@docs id, identifier, label, icon, elementType, drag, elements
 @docs isEmptyGroup, isGroup, isPlaceholder
 
 
 # Updating an element
 
-@docs withId, open, toggleOpen, updateDrag, updateIds, updateIdsFoldFn
+@docs withId, open, toggleOpen, updateDrag, updateIds
 
 
 # Tree traversal
@@ -50,18 +60,13 @@ editor manipulates, its JSON codec, and materialization into a
 
 @docs encode, decode
 
-
-# Materialization
-
-@docs toField
-
 -}
 
 import Basics.Extra exposing (flip)
-import Editor.Drag as Drag exposing (Drag)
-import Editor.Id as Id exposing (Id)
-import FormToolkit.Field as Field
+import Dict exposing (Dict)
 import FormToolkit.Value as Value exposing (Value(..))
+import Internal.Editor.Drag as Drag exposing (Drag)
+import Internal.Editor.Id as Id exposing (Id)
 import Internal.Value as InternalValue
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
@@ -83,46 +88,68 @@ type alias Options =
 
 
 type alias FieldParams =
-    { name : Maybe String
-    , label : Maybe String
-    , placeholder : Maybe String
-    , hint : Maybe String
-    , help : Maybe String
-    , isRequired : Bool
-    , field : Field
+    { field : Field
+    , attributes : List Attribute
     , id : Id
     , drag : Drag
     }
 
 
+{-| A property of an element.
+
+  - `Name`, `Label`, `Placeholder`, `Hint` — the input's name, label,
+    placeholder, and hint text.
+  - `HelpText` — the field's help text: kept with the element, but not
+    rendered into the form.
+  - `Text`, `Button` — the body of a `Review`, and the body and button text of
+    a `Help`.
+  - `Required` — whether the input has to be filled in.
+  - `Inline` — whether a group lays its fields out next to each other.
+
+An element carries at most one variant per property; a property with no
+variant is unset.
+
+-}
+type Attribute
+    = Name String
+    | Label String
+    | Placeholder String
+    | Hint String
+    | HelpText String
+    | Button String
+    | Text String
+    | Required Bool
+    | Inline Bool
+
+
+{-| The first attribute for which `getter` succeeds, if any.
+-}
+attribute : (Attribute -> Maybe val) -> List Attribute -> Maybe val
+attribute getter attributes =
+    List.head (List.filterMap getter attributes)
+
+
 type Element
     = FieldElement FieldParams
     | Review
-        { name : Maybe String
-        , text : Maybe String
+        { attributes : List Attribute
         , id : Id
         , drag : Drag
         }
     | Help
-        { name : Maybe String
-        , button : Maybe String
-        , text : Maybe String
+        { attributes : List Attribute
         , id : Id
         , drag : Drag
         }
     | RepeatableGroup
-        { name : Maybe String
-        , label : Maybe String
-        , inline : Bool
+        { attributes : List Attribute
         , elements : List Element
         , id : Id
         , drag : Drag
         , isOpen : Bool
         }
     | ElementGroup
-        { name : Maybe String
-        , label : Maybe String
-        , inline : Bool
+        { attributes : List Attribute
         , elements : List Element
         , id : Id
         , drag : Drag
@@ -170,9 +197,7 @@ group : Element
 group =
     ElementGroup
         { id = Id.unset
-        , name = Nothing
-        , label = Nothing
-        , inline = False
+        , attributes = []
         , elements = []
         , isOpen = False
         , drag = Drag.idle
@@ -183,33 +208,10 @@ repeatableGroup : Element
 repeatableGroup =
     RepeatableGroup
         { id = Id.unset
-        , name = Nothing
-        , label = Nothing
-        , inline = False
+        , attributes = []
         , elements = []
         , drag = Drag.idle
         , isOpen = True
-        }
-
-
-review : Element
-review =
-    Review
-        { id = Id.unset
-        , name = Nothing
-        , text = Nothing
-        , drag = Drag.idle
-        }
-
-
-help : Element
-help =
-    Help
-        { id = Id.unset
-        , name = Nothing
-        , button = Nothing
-        , text = Nothing
-        , drag = Drag.idle
         }
 
 
@@ -217,9 +219,7 @@ root : List Element -> Element
 root children =
     ElementGroup
         { id = Id.unset
-        , name = Just "root"
-        , label = Nothing
-        , inline = False
+        , attributes = [ Name "root" ]
         , elements = children
         , drag = Drag.idle
         , isOpen = False
@@ -291,56 +291,181 @@ id element =
 
 identifier : Element -> Maybe String
 identifier element =
-    Id.toIdentifier (Just (name element)) (id element)
+    Id.toIdentifier (name element) (id element)
 
 
-name : Element -> String
+{-| The [Name](#Attribute) of an element, if it has one.
+-}
+name : Element -> Maybe String
 name element =
     case element of
         ElementGroup params ->
-            params.name |> Maybe.withDefault ""
+            nameAttribute params.attributes
 
         RepeatableGroup params ->
-            params.name |> Maybe.withDefault ""
+            nameAttribute params.attributes
 
         FieldElement params ->
-            params.name |> Maybe.withDefault ""
+            nameAttribute params.attributes
 
         Review params ->
-            params.name |> Maybe.withDefault ""
+            nameAttribute params.attributes
 
         Help params ->
-            params.name |> Maybe.withDefault ""
+            nameAttribute params.attributes
 
         Blank _ ->
-            ""
+            Nothing
 
 
 label : Element -> String
 label element =
     case element of
         ElementGroup params ->
-            params.label
+            labelAttribute params.attributes
                 |> Maybe.withDefault "Group"
 
         RepeatableGroup params ->
-            params.label
+            labelAttribute params.attributes
                 |> Maybe.withDefault "Repeatable"
 
         FieldElement params ->
-            params.label
+            labelAttribute params.attributes
                 |> Maybe.withDefault (String.toSentenceCase (elementType element))
 
         Review params ->
-            params.name
+            nameAttribute params.attributes
                 |> Maybe.withDefault "Review"
 
         Help params ->
-            params.button
+            buttonAttribute params.attributes
                 |> Maybe.withDefault "Help"
 
         Blank _ ->
             ""
+
+
+{-| Read one property off an element's attribute list, with a getter per
+[Attribute](#Attribute) variant. `requiredAttribute` and `inlineAttribute` are
+`False` when the property is unset.
+-}
+nameAttribute : List Attribute -> Maybe String
+nameAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Name name_ ->
+                    Just name_
+
+                _ ->
+                    Nothing
+        )
+
+
+labelAttribute : List Attribute -> Maybe String
+labelAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Label label_ ->
+                    Just label_
+
+                _ ->
+                    Nothing
+        )
+
+
+placeholderAttribute : List Attribute -> Maybe String
+placeholderAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Placeholder placeholder_ ->
+                    Just placeholder_
+
+                _ ->
+                    Nothing
+        )
+
+
+hintAttribute : List Attribute -> Maybe String
+hintAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Hint hint_ ->
+                    Just hint_
+
+                _ ->
+                    Nothing
+        )
+
+
+helpTextAttribute : List Attribute -> Maybe String
+helpTextAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                HelpText helpText_ ->
+                    Just helpText_
+
+                _ ->
+                    Nothing
+        )
+
+
+buttonAttribute : List Attribute -> Maybe String
+buttonAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Button button_ ->
+                    Just button_
+
+                _ ->
+                    Nothing
+        )
+
+
+textAttribute : List Attribute -> Maybe String
+textAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Text text_ ->
+                    Just text_
+
+                _ ->
+                    Nothing
+        )
+
+
+requiredAttribute : List Attribute -> Bool
+requiredAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Required value ->
+                    Just value
+
+                _ ->
+                    Nothing
+        )
+        >> Maybe.withDefault False
+
+
+inlineAttribute : List Attribute -> Bool
+inlineAttribute =
+    attribute
+        (\attr ->
+            case attr of
+                Inline value ->
+                    Just value
+
+                _ ->
+                    Nothing
+        )
+        >> Maybe.withDefault False
 
 
 elements : Element -> List Element
@@ -556,112 +681,146 @@ isPlaceholder element =
 -- CODEC
 
 
-{-| Serialize an element tree to JSON.
+{-| Serialize an element tree to JSON, or `Nothing` for a
+[Blank](#Element) placeholder.
 
-`Blank` nodes encode to `Nothing` and are dropped from their parent's
-`fields` list. Runtime-only state (ids, drag state, collapsed/expanded) is not
-serialized: decoding assigns fresh ids (`Id.unset`), resets drag state
-(`Drag.idle`) and opens all groups, so a loaded form is fully expanded.
+Load it back with [decode](#decode). Element ids and the builder's transient
+state (selection, drag, collapsed groups) are not saved: a loaded tree has no
+ids until you assign them with `Internal.Editor.Builder.withElement`, and its groups are
+open.
 
 -}
 encode : Element -> Maybe Encode.Value
 encode element =
-    let
-        maybeValue =
-            Encode.object >> Just
-    in
     case element of
         ElementGroup attrs ->
-            maybeValue
-                [ ( "type", Encode.string (elementType element) )
-                , ( "inline", Encode.bool attrs.inline )
-                , ( "name", encodeMaybeString attrs.name )
-                , ( "label", encodeMaybeString attrs.label )
-                , ( "fields"
-                  , Encode.list identity (List.filterMap encode attrs.elements)
-                  )
-                ]
+            Just
+                (Encode.object
+                    ([ ( "type", Encode.string (elementType element) )
+                     , ( "fields"
+                       , Encode.list identity (List.filterMap encode attrs.elements)
+                       )
+                     ]
+                        ++ encodeAttributes attrs.attributes
+                    )
+                )
 
         RepeatableGroup attrs ->
-            maybeValue
-                [ ( "type", Encode.string (elementType element) )
-                , ( "inline", Encode.bool attrs.inline )
-                , ( "name", encodeMaybeString attrs.name )
-                , ( "label", encodeMaybeString attrs.label )
-                , ( "fields"
-                  , Encode.list identity (List.filterMap encode attrs.elements)
-                  )
-                ]
+            Just
+                (Encode.object
+                    ([ ( "type", Encode.string (elementType element) )
+                     , ( "fields"
+                       , Encode.list identity (List.filterMap encode attrs.elements)
+                       )
+                     ]
+                        ++ encodeAttributes attrs.attributes
+                    )
+                )
 
         FieldElement attrs ->
             let
-                attributesValues =
-                    [ ( "type", Encode.string (elementType element) )
-                    , ( "name", encodeMaybeString attrs.name )
-                    , ( "label", encodeMaybeString attrs.label )
-                    , ( "placeholder", encodeMaybeString attrs.placeholder )
-                    , ( "help", encodeMaybeString attrs.help )
-                    , ( "hint", encodeMaybeString attrs.hint )
-                    , ( "required", Encode.bool attrs.isRequired )
-                    ]
+                typePair =
+                    ( "type", Encode.string (elementType element) )
+
+                attributePairs =
+                    encodeAttributes attrs.attributes
+
+                elementJson extraPairs =
+                    Just (Encode.object (typePair :: (extraPairs ++ attributePairs)))
             in
             case attrs.field of
                 TextField ->
-                    maybeValue attributesValues
+                    elementJson []
 
                 Checkbox ->
-                    maybeValue attributesValues
+                    elementJson []
 
                 IntegerField { min, max } ->
-                    ( "min", Encode.string (Maybe.withDefault "" (Value.toString min)) )
-                        :: ( "max", Encode.string (Maybe.withDefault "" (Value.toString max)) )
-                        :: attributesValues
-                        |> maybeValue
+                    elementJson (rangePair min max)
 
                 DateField { min, max } ->
-                    ( "min", Encode.string (Maybe.withDefault "" (Value.toString min)) )
-                        :: ( "max", Encode.string (Maybe.withDefault "" (Value.toString max)) )
-                        :: attributesValues
-                        |> maybeValue
+                    elementJson (rangePair min max)
 
                 MonthField { min, max } ->
-                    ( "min", Encode.string (Maybe.withDefault "" (Value.toString min)) )
-                        :: ( "max", Encode.string (Maybe.withDefault "" (Value.toString max)) )
-                        :: attributesValues
-                        |> maybeValue
+                    elementJson (rangePair min max)
 
                 Select options ->
-                    ( "options", encodeOptions options )
-                        :: attributesValues
-                        |> maybeValue
+                    elementJson (optionsPair options)
 
                 Radio options ->
-                    ( "options", encodeOptions options )
-                        :: attributesValues
-                        |> maybeValue
+                    elementJson (optionsPair options)
 
         Review attrs ->
-            maybeValue
-                [ ( "type", Encode.string (elementType element) )
-                , ( "name", encodeMaybeString attrs.name )
-                , ( "text", encodeMaybeString attrs.text )
-                ]
+            Just
+                (Encode.object
+                    (( "type", Encode.string (elementType element) )
+                        :: encodeAttributes attrs.attributes
+                    )
+                )
 
         Help attrs ->
-            maybeValue
-                [ ( "type", Encode.string (elementType element) )
-                , ( "name", encodeMaybeString attrs.name )
-                , ( "button", encodeMaybeString attrs.button )
-                , ( "text", encodeMaybeString attrs.text )
-                ]
+            Just
+                (Encode.object
+                    (( "type", Encode.string (elementType element) )
+                        :: encodeAttributes attrs.attributes
+                    )
+                )
 
         Blank _ ->
             Nothing
 
 
-encodeMaybeString : Maybe String -> Encode.Value
-encodeMaybeString =
-    Maybe.map Encode.string >> Maybe.withDefault Encode.null
+rangePair : Value -> Value -> List ( String, Encode.Value )
+rangePair min max =
+    [ ( "min", Encode.string (Maybe.withDefault "" (Value.toString min)) )
+    , ( "max", Encode.string (Maybe.withDefault "" (Value.toString max)) )
+    ]
+
+
+optionsPair : Options -> List ( String, Encode.Value )
+optionsPair options =
+    [ ( "options", encodeOptions options ) ]
+
+
+{-| The key/value pairs the element's attributes contribute to its object,
+in the order the attributes appear.
+-}
+encodeAttributes : List Attribute -> List ( String, Encode.Value )
+encodeAttributes =
+    List.map encodeAttribute
+
+
+{-| The JSON key and value for one attribute.
+-}
+encodeAttribute : Attribute -> ( String, Encode.Value )
+encodeAttribute attr =
+    case attr of
+        Name s ->
+            ( "name", Encode.string s )
+
+        Label s ->
+            ( "label", Encode.string s )
+
+        Placeholder s ->
+            ( "placeholder", Encode.string s )
+
+        Hint s ->
+            ( "hint", Encode.string s )
+
+        HelpText s ->
+            ( "help", Encode.string s )
+
+        Button s ->
+            ( "button", Encode.string s )
+
+        Text s ->
+            ( "text", Encode.string s )
+
+        Required b ->
+            ( "required", Encode.bool b )
+
+        Inline b ->
+            ( "inline", Encode.bool b )
 
 
 encodeOptions : Options -> Encode.Value
@@ -679,9 +838,10 @@ encodeOptions =
 -- DECODER
 
 
-{-| Deserialize an element tree from the JSON produced by [encode](#encode).
+{-| Load an element tree from the JSON produced by [encode](#encode).
 
-Decoded elements get `Id.unset` ids, `Drag.idle` drag state, and open groups.
+The result has no ids yet and its groups are open: hand it to
+`Internal.Editor.Builder.withElement` to keep editing it.
 
 -}
 decode : Decoder Element
@@ -721,105 +881,173 @@ decodeByType typeName =
             decodeOptions Radio
 
         "review" ->
-            Decode.map2
-                (\elName elText ->
+            Decode.map
+                (\attributes ->
                     Review
                         { id = Id.unset
-                        , name = elName
-                        , text = elText
+                        , attributes = attributes
                         , drag = Drag.idle
                         }
                 )
-                (maybeDecodeString "name")
-                (maybeDecodeString "text")
+                attributesDecoder
 
         "help" ->
-            Decode.map3
-                (\elName elText button ->
+            Decode.map
+                (\attributes ->
                     Help
                         { id = Id.unset
-                        , name = elName
-                        , text = elText
-                        , button = button
+                        , attributes = attributes
                         , drag = Drag.idle
                         }
                 )
-                (maybeDecodeString "name")
-                (maybeDecodeString "text")
-                (maybeDecodeString "button")
+                attributesDecoder
 
         other ->
             Decode.fail ("Unsupported element type: " ++ other)
 
 
-decodeGroup : ({ id : Id, name : Maybe String, label : Maybe String, inline : Bool, elements : List Element, drag : Drag, isOpen : Bool } -> Element) -> Decoder Element
+decodeGroup : ({ attributes : List Attribute, elements : List Element, id : Id, drag : Drag, isOpen : Bool } -> Element) -> Decoder Element
 decodeGroup constructor =
-    Decode.map4
-        (\elName elLabel inline children ->
+    Decode.map2
+        (\attributes children ->
             constructor
                 { id = Id.unset
-                , name = elName
-                , label = elLabel
-                , inline = inline
+                , attributes = attributes
                 , elements = children
                 , drag = Drag.idle
                 , isOpen = True
                 }
         )
-        (maybeDecodeString "name")
-        (maybeDecodeString "label")
-        (Decode.field "inline" Decode.bool)
+        attributesDecoder
         (Decode.field "fields" (Decode.lazy (\_ -> Decode.list decode)))
 
 
-type alias FieldAttrs =
-    { name : Maybe String
-    , label : Maybe String
-    , placeholder : Maybe String
-    , hint : Maybe String
-    , help : Maybe String
-    , isRequired : Bool
+{-| Decode the [attributes](#Attribute) an element carries.
+
+An absent key and an explicit `null` both mean the attribute is absent; a
+present key of the wrong type fails the decode. The result is in canonical
+order.
+
+-}
+attributesDecoder : Decoder (List Attribute)
+attributesDecoder =
+    Decode.dict Decode.value
+        |> Decode.andThen attributesFromObject
+
+
+attributesFromObject : Dict String Decode.Value -> Decoder (List Attribute)
+attributesFromObject values =
+    List.foldr
+        (\spec -> Result.map2 (++) (attributeFromObject values spec))
+        (Ok [])
+        attributeSpecs
+        |> (\result ->
+                case result of
+                    Ok attributes ->
+                        Decode.succeed attributes
+
+                    Err message ->
+                        Decode.fail message
+           )
+
+
+{-| Every attribute's JSON key and value decoder, in canonical order.
+-}
+attributeSpecs : List AttributeSpec
+attributeSpecs =
+    [ stringAttributeSpec "name" Name
+    , stringAttributeSpec "label" Label
+    , stringAttributeSpec "placeholder" Placeholder
+    , stringAttributeSpec "hint" Hint
+    , stringAttributeSpec "help" HelpText
+    , stringAttributeSpec "button" Button
+    , stringAttributeSpec "text" Text
+    , boolAttributeSpec "required" Required
+    , boolAttributeSpec "inline" Inline
+    ]
+
+
+type alias AttributeSpec =
+    { key : String
+    , decode : Decode.Value -> Result Decode.Error (Maybe Attribute)
     }
 
 
-fieldAttrsDecoder : Decoder FieldAttrs
-fieldAttrsDecoder =
-    Decode.map6 FieldAttrs
-        (maybeDecodeString "name")
-        (maybeDecodeString "label")
-        (maybeDecodeString "placeholder")
-        (maybeDecodeString "hint")
-        (maybeDecodeString "help")
-        (Decode.field "required" Decode.bool)
+stringAttributeSpec : String -> (String -> Attribute) -> AttributeSpec
+stringAttributeSpec key constructor =
+    { key = key
+    , decode = \value -> Decode.decodeValue (stringOrNull constructor) value
+    }
 
 
-fieldElementFrom : FieldAttrs -> Field -> Element
-fieldElementFrom attrs field =
+boolAttributeSpec : String -> (Bool -> Attribute) -> AttributeSpec
+boolAttributeSpec key constructor =
+    { key = key
+    , decode = \value -> Decode.decodeValue (boolOrNull constructor) value
+    }
+
+
+{-| `null` means the attribute is absent; a mistyped value is an error rather
+than being dropped.
+-}
+stringOrNull : (String -> Attribute) -> Decoder (Maybe Attribute)
+stringOrNull constructor =
+    Decode.oneOf
+        [ Decode.map (constructor >> Just) Decode.string
+        , Decode.null Nothing
+        ]
+
+
+boolOrNull : (Bool -> Attribute) -> Decoder (Maybe Attribute)
+boolOrNull constructor =
+    Decode.oneOf
+        [ Decode.map (constructor >> Just) Decode.bool
+        , Decode.null Nothing
+        ]
+
+
+attributeFromObject : Dict String Decode.Value -> AttributeSpec -> Result String (List Attribute)
+attributeFromObject values spec =
+    case Dict.get spec.key values of
+        Nothing ->
+            Ok []
+
+        Just value ->
+            spec.decode value
+                |> Result.mapError (\error -> spec.key ++ ": " ++ Decode.errorToString error)
+                |> Result.map
+                    (\maybeAttribute ->
+                        case maybeAttribute of
+                            Just attr ->
+                                [ attr ]
+
+                            Nothing ->
+                                []
+                    )
+
+
+fieldElementFrom : List Attribute -> Field -> Element
+fieldElementFrom attributes field =
     FieldElement
         { id = Id.unset
         , field = field
-        , name = attrs.name
-        , label = attrs.label
-        , placeholder = attrs.placeholder
-        , hint = attrs.hint
-        , help = attrs.help
-        , isRequired = attrs.isRequired
+        , attributes = attributes
         , drag = Drag.idle
         }
 
 
 decodeField : Field -> Decoder Element
 decodeField field =
-    Decode.map (\attrs -> fieldElementFrom attrs field) fieldAttrsDecoder
+    Decode.map (\attributes -> fieldElementFrom attributes field) attributesDecoder
 
 
 decodeRange : ({ min : Value, max : Value } -> Field) -> (String -> InternalValue.Value) -> Decoder Element
 decodeRange fieldType fromString =
     Decode.map2
-        (\attrs ( min, max ) ->
-            fieldElementFrom attrs (fieldType { min = min, max = max })
+        (\attributes ( min, max ) ->
+            fieldElementFrom attributes (fieldType { min = min, max = max })
         )
-        fieldAttrsDecoder
+        attributesDecoder
         (Decode.map2 Tuple.pair
             (rangeValueDecoder "min" fromString)
             (rangeValueDecoder "max" fromString)
@@ -834,8 +1062,8 @@ rangeValueDecoder key fromString =
 decodeOptions : (Options -> Field) -> Decoder Element
 decodeOptions fieldType =
     Decode.map2
-        (\attrs options -> fieldElementFrom attrs (fieldType options))
-        fieldAttrsDecoder
+        (\attributes options -> fieldElementFrom attributes (fieldType options))
+        attributesDecoder
         optionsDecoder
 
 
@@ -850,140 +1078,6 @@ optionsDecoder =
         )
 
 
-maybeDecodeString : String -> Decoder (Maybe String)
-maybeDecodeString key =
-    Decode.maybe (Decode.field key Decode.string)
-
-
-
--- MATERIALIZE
-
-
-{-| Materialize an element tree into a `FormToolkit.Field` form.
-
-Fields carry their `name` and `identifier` (the element `Id`), so the resulting
-form can be filled in, validated, and round-tripped through `Parse.json` /
-`Field.updateValuesFromJson`. A group's `inline` format is carried over, and
-builder-only concerns (`help`, drag/open state) are not. Repeatable groups
-become `Field.repeatable`, with `inline` applied to the repeated group. Empty
-groups and `Blank` placeholders materialize to `Nothing` and are dropped from
-their parent.
-
--}
-toField : Element -> Maybe (Field.Field Id)
-toField element =
-    case element of
-        FieldElement params ->
-            Just (fieldElementToField params)
-
-        ElementGroup params ->
-            case List.filterMap toField params.elements of
-                [] ->
-                    Nothing
-
-                children ->
-                    Just (Field.group (groupAttributes params ++ inlineAttributes params) children)
-
-        RepeatableGroup params ->
-            case List.filterMap toField params.elements of
-                [] ->
-                    Nothing
-
-                children ->
-                    Just (Field.repeatable (groupAttributes params) (Field.group (inlineAttributes params) children) [])
-
-        Review params ->
-            Just
-                (Field.textarea
-                    (maybeString params.name Field.name
-                        ++ [ Field.identifier params.id ]
-                        ++ maybeString params.text (Field.value << Value.string)
-                    )
-                )
-
-        Help params ->
-            Just
-                (Field.text
-                    (maybeString params.name Field.name
-                        ++ [ Field.identifier params.id ]
-                        ++ maybeString params.button Field.label
-                        ++ maybeString params.text (Field.value << Value.string)
-                    )
-                )
-
-        Blank _ ->
-            Nothing
-
-
-fieldElementToField : FieldParams -> Field.Field Id
-fieldElementToField params =
-    case params.field of
-        TextField ->
-            Field.text (fieldAttributes params)
-
-        Checkbox ->
-            Field.checkbox (fieldAttributes params)
-
-        IntegerField { min, max } ->
-            Field.int (fieldAttributes params ++ [ Field.min min, Field.max max ])
-
-        DateField { min, max } ->
-            Field.date (fieldAttributes params ++ [ Field.min min, Field.max max ])
-
-        MonthField { min, max } ->
-            Field.month (fieldAttributes params ++ [ Field.min min, Field.max max ])
-
-        Select options ->
-            Field.select (fieldAttributes params ++ [ Field.options (optionsToField options) ])
-
-        Radio options ->
-            Field.radio (fieldAttributes params ++ [ Field.options (optionsToField options) ])
-
-
-fieldAttributes : FieldParams -> List (Field.Attribute Id val)
-fieldAttributes params =
-    maybeString params.name Field.name
-        ++ maybeString params.label Field.label
-        ++ maybeString params.placeholder Field.placeholder
-        ++ maybeString params.hint Field.hint
-        ++ [ Field.identifier params.id, Field.required params.isRequired ]
-
-
-groupAttributes :
-    { a | name : Maybe String, label : Maybe String, id : Id }
-    -> List (Field.Attribute Id val)
-groupAttributes params =
-    maybeString params.name Field.name
-        ++ maybeString params.label Field.label
-        ++ [ Field.identifier params.id ]
-
-
-{-| Carry the builder's group format over to the rendered form.
--}
-inlineAttributes : { a | inline : Bool } -> List (Field.Attribute Id val)
-inlineAttributes params =
-    if params.inline then
-        [ Field.inline ]
-
-    else
-        []
-
-
-optionsToField : Options -> List ( String, Value )
-optionsToField =
-    List.map (\( val, label_ ) -> ( label_, Value.string val ))
-
-
-maybeString : Maybe String -> (String -> attr) -> List attr
-maybeString maybeValue toAttr =
-    case maybeValue of
-        Just string ->
-            [ toAttr string ]
-
-        Nothing ->
-            []
-
-
 
 -- HELPERS
 
@@ -993,12 +1087,7 @@ makeField field =
     FieldElement
         { id = Id.unset
         , field = field
-        , name = Nothing
-        , isRequired = False
-        , label = Nothing
-        , placeholder = Nothing
-        , hint = Nothing
-        , help = Nothing
+        , attributes = []
         , drag = Drag.idle
         }
 

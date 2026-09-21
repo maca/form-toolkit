@@ -1,23 +1,23 @@
 module EditorElementJsonTest exposing (suite)
 
-{- Tests for the editor (form-definition) JSON codec.
+{- Tests for the editor (form-definition) JSON codec: the round-trip pair
+   Editor.Element.encode / Editor.Element.decode, and the raw JSON they pin.
 
-The codec is the round-trip pair Editor.Element.encode / Editor.Element.decode:
+   Not serialized: ids, drag state, and whether groups are open — a decoded
+   tree is fully expanded.
 
-  - encode : Element -> Maybe Encode.Value
-  - decode : Decoder Element
-
-id, drag and isOpen are runtime concerns and are NOT serialized: decode resets
-id to Id.unset and drag to Drag.idle, and defaults isOpen to True so a loaded
-form is fully expanded.
+   Fixtures are compared with (==), so their attribute lists follow the order
+   decode produces: Name, Label, Placeholder, Hint, HelpText, Button, Text,
+   Required, Inline.
 -}
 
-import Editor.Drag as Drag
-import Editor.Element as Element exposing (Element(..), Field(..))
-import Editor.Id as Id
 import Expect
 import FormToolkit.Value as Value
+import Internal.Editor.Drag as Drag
+import Internal.Editor.Element as Element exposing (Attribute(..), Element(..), Field(..))
+import Internal.Editor.Id as Id
 import Json.Decode as Decode
+import Json.Encode as Encode
 import Test exposing (..)
 import Time
 
@@ -39,7 +39,7 @@ suite =
             , test "help" <| \_ -> roundTrip helpElement
             ]
         , describe "attribute variants"
-            [ test "nullable attributes stay Nothing" <| \_ -> roundTrip minimalTextField
+            [ test "a field with no attributes round-trips" <| \_ -> roundTrip minimalTextField
             , test "empty select options round-trip" <| \_ -> roundTrip emptySelectField
             , test "blank range bounds round-trip" <| \_ -> roundTrip blankRangeField
             , test "encode Blank is Nothing" <|
@@ -78,6 +78,59 @@ suite =
                         |> Expect.equal
                             (Just (Ok [ ( "en", "English" ), ( "es", "Spanish" ) ]))
             ]
+        , describe "the encoded JSON is pinned (the external contract)"
+            [ test "a field with every kind of attribute" <|
+                \_ ->
+                    textField
+                        |> encodedJson
+                        |> Expect.equal
+                            (Just
+                                """{"type":"text","name":"first_name","label":"First name","placeholder":"e.g. Frank","hint":"Your given name","help":"As it appears on your passport","required":true}"""
+                            )
+            , test "an unset attribute produces no key" <|
+                \_ ->
+                    minimalTextField
+                        |> encodedJson
+                        |> Expect.equal (Just """{"type":"text"}""")
+            , test "a ranged field carries min and max" <|
+                \_ ->
+                    blankRangeField
+                        |> encodedJson
+                        |> Expect.equal
+                            (Just
+                                """{"type":"integer","min":"","max":"","name":"unbounded","label":"Unbounded"}"""
+                            )
+            , test "a group carries its fields and its own attributes" <|
+                \_ ->
+                    groupElement
+                        |> encodedJson
+                        |> Expect.equal
+                            (Just
+                                """{"type":"group","fields":[{"type":"text"}],"name":"person","label":"Person","inline":true}"""
+                            )
+            ]
+        , describe "decode tolerance and strictness"
+            [ test "explicit nulls and absent keys mean the same thing" <|
+                \_ ->
+                    """{"type":"text","name":"first_name","label":null,"placeholder":null,"hint":null,"help":null,"required":false}"""
+                        |> Decode.decodeString Element.decode
+                        |> Expect.equal
+                            (Ok
+                                (FieldElement
+                                    { id = Id.unset
+                                    , field = TextField
+                                    , attributes = [ Name "first_name", Required False ]
+                                    , drag = Drag.idle
+                                    }
+                                )
+                            )
+            , test "an attribute of the wrong type fails the decode" <|
+                \_ ->
+                    """{"type":"text","name":5}"""
+                        |> Decode.decodeString Element.decode
+                        |> Result.toMaybe
+                        |> Expect.equal Nothing
+            ]
         ]
 
 
@@ -96,6 +149,13 @@ encodedField fieldDecoder element =
         |> Maybe.map (Decode.decodeValue fieldDecoder)
 
 
+encodedJson : Element -> Maybe String
+encodedJson element =
+    element
+        |> Element.encode
+        |> Maybe.map (Encode.encode 0)
+
+
 
 -- Element fixtures
 
@@ -105,12 +165,14 @@ textField =
     FieldElement
         { id = Id.unset
         , field = TextField
-        , name = Just "first_name"
-        , label = Just "First name"
-        , placeholder = Just "e.g. Frank"
-        , hint = Just "Your given name"
-        , help = Just "As it appears on your passport"
-        , isRequired = True
+        , attributes =
+            [ Name "first_name"
+            , Label "First name"
+            , Placeholder "e.g. Frank"
+            , Hint "Your given name"
+            , HelpText "As it appears on your passport"
+            , Required True
+            ]
         , drag = Drag.idle
         }
 
@@ -120,12 +182,12 @@ checkboxField =
     FieldElement
         { id = Id.unset
         , field = Checkbox
-        , name = Just "subscribe"
-        , label = Just "Subscribe to the newsletter"
-        , placeholder = Nothing
-        , hint = Just "We send at most one email a month"
-        , help = Just "You can unsubscribe at any time"
-        , isRequired = False
+        , attributes =
+            [ Name "subscribe"
+            , Label "Subscribe to the newsletter"
+            , Hint "We send at most one email a month"
+            , HelpText "You can unsubscribe at any time"
+            ]
         , drag = Drag.idle
         }
 
@@ -135,12 +197,14 @@ integerField =
     FieldElement
         { id = Id.unset
         , field = IntegerField { min = Value.int 0, max = Value.int 100 }
-        , name = Just "age"
-        , label = Just "Age"
-        , placeholder = Just "42"
-        , hint = Just "Your age in years"
-        , help = Just "Must be at least 18"
-        , isRequired = True
+        , attributes =
+            [ Name "age"
+            , Label "Age"
+            , Placeholder "42"
+            , Hint "Your age in years"
+            , HelpText "Must be at least 18"
+            , Required True
+            ]
         , drag = Drag.idle
         }
 
@@ -150,12 +214,13 @@ dateField =
     FieldElement
         { id = Id.unset
         , field = DateField { min = Value.date (Time.millisToPosix 0), max = Value.date (Time.millisToPosix 0) }
-        , name = Just "birth_date"
-        , label = Just "Birth date"
-        , placeholder = Nothing
-        , hint = Just "When were you born?"
-        , help = Just "Used to calculate age"
-        , isRequired = True
+        , attributes =
+            [ Name "birth_date"
+            , Label "Birth date"
+            , Hint "When were you born?"
+            , HelpText "Used to calculate age"
+            , Required True
+            ]
         , drag = Drag.idle
         }
 
@@ -165,12 +230,10 @@ monthField =
     FieldElement
         { id = Id.unset
         , field = MonthField { min = Value.month (Time.millisToPosix 0), max = Value.month (Time.millisToPosix 0) }
-        , name = Just "start_month"
-        , label = Just "Start month"
-        , placeholder = Nothing
-        , hint = Nothing
-        , help = Nothing
-        , isRequired = False
+        , attributes =
+            [ Name "start_month"
+            , Label "Start month"
+            ]
         , drag = Drag.idle
         }
 
@@ -180,12 +243,13 @@ selectField =
     FieldElement
         { id = Id.unset
         , field = Select [ ( "en", "English" ), ( "es", "Spanish" ), ( "fr", "French" ) ]
-        , name = Just "language"
-        , label = Just "Language"
-        , placeholder = Just "Choose a language"
-        , hint = Just "Used for localization"
-        , help = Nothing
-        , isRequired = True
+        , attributes =
+            [ Name "language"
+            , Label "Language"
+            , Placeholder "Choose a language"
+            , Hint "Used for localization"
+            , Required True
+            ]
         , drag = Drag.idle
         }
 
@@ -195,12 +259,11 @@ radioField =
     FieldElement
         { id = Id.unset
         , field = Radio [ ( "yes", "Yes" ), ( "no", "No" ) ]
-        , name = Just "contact_ok"
-        , label = Just "May we contact you?"
-        , placeholder = Nothing
-        , hint = Nothing
-        , help = Nothing
-        , isRequired = True
+        , attributes =
+            [ Name "contact_ok"
+            , Label "May we contact you?"
+            , Required True
+            ]
         , drag = Drag.idle
         }
 
@@ -209,10 +272,12 @@ groupElement : Element
 groupElement =
     ElementGroup
         { id = Id.unset
-        , name = Just "person"
-        , label = Just "Person"
-        , inline = True
-        , elements = [ textField ]
+        , attributes =
+            [ Name "person"
+            , Label "Person"
+            , Inline True
+            ]
+        , elements = [ minimalTextField ]
         , isOpen = True
         , drag = Drag.idle
         }
@@ -222,9 +287,10 @@ repeatableElement : Element
 repeatableElement =
     RepeatableGroup
         { id = Id.unset
-        , name = Just "addresses"
-        , label = Just "Addresses"
-        , inline = False
+        , attributes =
+            [ Name "addresses"
+            , Label "Addresses"
+            ]
         , elements = [ textField ]
         , isOpen = True
         , drag = Drag.idle
@@ -235,8 +301,10 @@ reviewElement : Element
 reviewElement =
     Review
         { id = Id.unset
-        , name = Just "summary"
-        , text = Just "Please review your details before submitting"
+        , attributes =
+            [ Name "summary"
+            , Text "Please review your details before submitting"
+            ]
         , drag = Drag.idle
         }
 
@@ -245,9 +313,11 @@ helpElement : Element
 helpElement =
     Help
         { id = Id.unset
-        , name = Just "help_text"
-        , button = Just "Need help?"
-        , text = Just "Contact support@example.com"
+        , attributes =
+            [ Name "help_text"
+            , Button "Need help?"
+            , Text "Contact support@example.com"
+            ]
         , drag = Drag.idle
         }
 
@@ -257,12 +327,7 @@ minimalTextField =
     FieldElement
         { id = Id.unset
         , field = TextField
-        , name = Nothing
-        , label = Nothing
-        , placeholder = Nothing
-        , hint = Nothing
-        , help = Nothing
-        , isRequired = False
+        , attributes = []
         , drag = Drag.idle
         }
 
@@ -272,12 +337,10 @@ emptySelectField =
     FieldElement
         { id = Id.unset
         , field = Select []
-        , name = Just "empty"
-        , label = Just "Empty"
-        , placeholder = Nothing
-        , hint = Nothing
-        , help = Nothing
-        , isRequired = False
+        , attributes =
+            [ Name "empty"
+            , Label "Empty"
+            ]
         , drag = Drag.idle
         }
 
@@ -287,11 +350,9 @@ blankRangeField =
     FieldElement
         { id = Id.unset
         , field = IntegerField { min = Value.blank, max = Value.blank }
-        , name = Just "unbounded"
-        , label = Just "Unbounded"
-        , placeholder = Nothing
-        , hint = Nothing
-        , help = Nothing
-        , isRequired = False
+        , attributes =
+            [ Name "unbounded"
+            , Label "Unbounded"
+            ]
         , drag = Drag.idle
         }

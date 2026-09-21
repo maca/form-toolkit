@@ -678,15 +678,7 @@ datetimeFieldTests =
                             |> fillInput "datetime-field" ""
                             |> blur "datetime-field"
                 in
-                case result of
-                    Err (Error.IsBlank _) ->
-                        Expect.pass
-
-                    other ->
-                        Expect.fail
-                            ("Expected blank required datetime to fail with IsBlank, got "
-                                ++ Debug.toString other
-                            )
+                Expect.equal (Err (Error.IsBlank Nothing)) result
         , test "required blank datetime fails the app submit gate (Parse.succeed True)" <|
             \_ ->
                 let
@@ -702,15 +694,7 @@ datetimeFieldTests =
                             |> fillInput "datetime-field" ""
                             |> blur "datetime-field"
                 in
-                case result of
-                    Err (Error.IsBlank _) ->
-                        Expect.pass
-
-                    other ->
-                        Expect.fail
-                            ("Expected blank required datetime to block the submit gate with IsBlank, got "
-                                ++ Debug.toString other
-                            )
+                Expect.equal (Err (Error.IsBlank Nothing)) result
         , test "non-required blank datetime does not fail the submit gate" <|
             \_ ->
                 let

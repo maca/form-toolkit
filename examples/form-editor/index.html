@@ -448,6 +448,17 @@
       flex: 1;
     }
 
+    /* warning triangle: css.gg has no such icon, so it is masked in from an svg */
+    .warning-icon {
+      display: block;
+      flex-shrink: 0;
+      width: 1.6rem;
+      height: 1.6rem;
+      background: currentColor;
+      -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>') center / 1.6rem 1.6rem no-repeat;
+      mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>') center / 1.6rem 1.6rem no-repeat;
+    }
+
     .schema-editor-container {
       flex: 0 0 55%;
       display: flex;
@@ -465,7 +476,7 @@
       user-select: none;
       flex: 1;
       display: flex;
-      overflow: hidden;
+      overflow: clip;
     }
 
     .schema-editor .schema-editor-panes {
@@ -518,6 +529,7 @@
     .schema-editor h3 {
       font-size: 2rem;
       line-height: 2;
+      font-weight: 400;
       margin: 0;
     }
 
@@ -530,7 +542,8 @@
       background: rgba(100, 200, 200, 0.4);
     }
 
-    .schema-editor .repeatable-group {
+    .schema-editor .repeatable-group,
+    .schema-editor .repeatable-group-addition {
       background: rgba(233, 222, 193, 0.4);
     }
 
@@ -663,6 +676,16 @@
       flex-direction: row;
       align-items: center;
     }
+
+    /* an invalid node warns at the end of its row */
+    .schema-editor .field-content .warning-icon,
+    .schema-editor .group-name .warning-icon {
+      margin-left: auto;
+      margin-right: 1.5rem;
+      color: #606c76;
+      opacity: 0.6;
+    }
+
 
     .schema-editor .group-name button {
       padding: 0 calc(var(--element-spacing) / 2) 0 0;

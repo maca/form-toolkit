@@ -1,4 +1,4 @@
-module Editor.Drag exposing
+module Internal.Editor.Drag exposing
     ( Drag(..), idle
     , Position(..), positionDecoder
     )

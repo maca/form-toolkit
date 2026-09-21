@@ -1,19 +1,21 @@
 module EditorElementToFieldTest exposing (suite)
 
-{- Tests for Editor.Element.toField: materializing an element tree into a
-   usable FormToolkit.Field.
+{- Tests for `FormToolkit.Field.load`: materializing the editor's canonical JSON
+   into a usable FormToolkit.Field.
 
-   The key property is that materialized fields carry their `name` (and the
-   element `Id` as identifier), so the resulting form can be filled and
-   round-tripped through the values codec (Parse.json / Field.updateValuesFromJson).
+   The key property is that loaded fields carry their `name`, so the resulting
+   form can be filled and round-tripped through the values codec
+   (Parse.json / Field.updateValuesFromJson). The schema carries no ids, so
+   `load` returns a form whose identifier type stays open.
 -}
 
-import Editor.Drag as Drag
-import Editor.Element as Element exposing (Element(..), Field(..))
-import Editor.Id as Id
 import Expect
+import FormToolkit.Error as Error
 import FormToolkit.Field as Field
 import FormToolkit.Parse as Parse
+import Internal.Editor.Drag as Drag
+import Internal.Editor.Element as Element exposing (Attribute(..), Element(..), Field(..))
+import Internal.Editor.Id as Id
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Test exposing (..)
@@ -23,22 +25,22 @@ import Test.Html.Selector exposing (class)
 
 suite : Test
 suite =
-    describe "Editor.Element.toField"
-        [ test "Blank materializes to Nothing" <|
+    describe "Field.load"
+        [ test "a JSON with no fields is an error" <|
             \_ ->
-                Element.toField (Blank (Id.fromInt 0))
-                    |> Expect.equal Nothing
-        , test "empty group materializes to Nothing" <|
+                loadJson """{"type":"group","name":"person","fields":[]}"""
+                    |> Expect.equal (Err "The JSON describes no fields")
+        , test "a JSON that is not an element is an error" <|
             \_ ->
-                Element.toField (groupElement [])
-                    |> Expect.equal Nothing
-        , test "named text field materializes with its name so values round-trip" <|
+                loadJson """{"type":"nonsense"}"""
+                    |> Expect.err
+        , test "named text field loads with its name so values round-trip" <|
             \_ ->
-                case Element.toField textFieldElement of
-                    Nothing ->
-                        Expect.fail "expected a field"
+                case loadElement textFieldElement of
+                    Err error ->
+                        Expect.fail error
 
-                    Just field ->
+                    Ok field ->
                         Field.group [] [ field ]
                             |> Field.updateValuesFromJson
                                 (Encode.object [ ( "first_name", Encode.string "Frank" ) ])
@@ -49,13 +51,13 @@ suite =
                                     >> Result.mapError Decode.errorToString
                                 )
                             |> Expect.equal (Ok "Frank")
-        , test "group materializes to a nested group keyed by name" <|
+        , test "group loads to a nested group keyed by name" <|
             \_ ->
-                case Element.toField (groupElement [ textFieldElement ]) of
-                    Nothing ->
-                        Expect.fail "expected a group"
+                case loadElement (groupElement [ textFieldElement ]) of
+                    Err error ->
+                        Expect.fail error
 
-                    Just field ->
+                    Ok field ->
                         Field.group [] [ field ]
                             |> Field.updateValuesFromJson
                                 (Encode.object
@@ -68,49 +70,45 @@ suite =
                                     >> Result.mapError Decode.errorToString
                                 )
                             |> Expect.equal (Ok "Frank")
-        , test "repeatable group materializes to a repeatable field" <|
+        , test "repeatable group loads to a repeatable field" <|
             \_ ->
-                Element.toField (repeatableGroupElement [ textFieldElement ])
+                loadElement (repeatableGroupElement [ textFieldElement ])
+                    |> Result.toMaybe
                     |> Expect.notEqual Nothing
-        , test "empty repeatable group materializes to Nothing" <|
+        , test "empty repeatable group is an error" <|
             \_ ->
-                Element.toField (repeatableGroupElement [])
-                    |> Expect.equal Nothing
+                loadElement (repeatableGroupElement [])
+                    |> Expect.equal (Err "The JSON describes no fields")
         , test "one JSON materializes the builder and a usable form" <|
             \_ ->
                 let
                     json =
                         """{"type":"group","inline":false,"name":"person","label":"Person","fields":[{"type":"text","name":"first_name","label":"First name","placeholder":null,"help":null,"hint":null,"required":false}]}"""
                 in
-                case Decode.decodeString Element.decode json of
+                case loadJson json of
                     Err error ->
-                        Expect.fail (Decode.errorToString error)
+                        Expect.fail error
 
-                    Ok element ->
-                        case Element.toField element of
-                            Nothing ->
-                                Expect.fail "expected a form"
-
-                            Just field ->
-                                Field.group [] [ field ]
-                                    |> Field.updateValuesFromJson
-                                        (Encode.object
-                                            [ ( "person", Encode.object [ ( "first_name", Encode.string "Frank" ) ] ) ]
-                                        )
-                                    |> Result.andThen (Parse.parse Parse.json)
-                                    |> Result.mapError (always "codec failed")
-                                    |> Result.andThen
-                                        (Decode.decodeValue (Decode.at [ "person", "first_name" ] Decode.string)
-                                            >> Result.mapError Decode.errorToString
-                                        )
-                                    |> Expect.equal (Ok "Frank")
+                    Ok field ->
+                        Field.group [] [ field ]
+                            |> Field.updateValuesFromJson
+                                (Encode.object
+                                    [ ( "person", Encode.object [ ( "first_name", Encode.string "Frank" ) ] ) ]
+                                )
+                            |> Result.andThen (Parse.parse Parse.json)
+                            |> Result.mapError (always "codec failed")
+                            |> Result.andThen
+                                (Decode.decodeValue (Decode.at [ "person", "first_name" ] Decode.string)
+                                    >> Result.mapError Decode.errorToString
+                                )
+                            |> Expect.equal (Ok "Frank")
         , test "an inline group renders its fields inline" <|
             \_ ->
-                case Element.toField (groupElementWith { inline = True } [ textFieldElement ]) of
-                    Nothing ->
-                        Expect.fail "expected a group"
+                case loadElement (groupElementWith { inline = True } [ textFieldElement ]) of
+                    Err error ->
+                        Expect.fail error
 
-                    Just field ->
+                    Ok field ->
                         field
                             |> Field.toHtml (always never)
                             |> Query.fromHtml
@@ -118,16 +116,38 @@ suite =
                             |> Query.has [ class "inline-fields" ]
         , test "a stacked group does not render inline" <|
             \_ ->
-                case Element.toField (groupElement [ textFieldElement ]) of
-                    Nothing ->
-                        Expect.fail "expected a group"
+                case loadElement (groupElement [ textFieldElement ]) of
+                    Err error ->
+                        Expect.fail error
 
-                    Just field ->
+                    Ok field ->
                         field
                             |> Field.toHtml (always never)
                             |> Query.fromHtml
                             |> Query.hasNot [ class "inline-fields" ]
         ]
+
+
+loadJson : String -> Result String (Field.Field id)
+loadJson json =
+    case Decode.decodeString Decode.value json of
+        Ok value ->
+            Field.load value
+                |> Result.mapError Error.toEnglish
+
+        Err error ->
+            Err (Decode.errorToString error)
+
+
+loadElement : Element -> Result String (Field.Field id)
+loadElement element =
+    case Element.encode element of
+        Just json ->
+            Field.load json
+                |> Result.mapError Error.toEnglish
+
+        Nothing ->
+            Err "the element is not encodable"
 
 
 
@@ -139,12 +159,10 @@ textFieldElement =
     FieldElement
         { id = Id.fromInt 1
         , field = TextField
-        , name = Just "first_name"
-        , label = Just "First name"
-        , placeholder = Nothing
-        , hint = Nothing
-        , help = Nothing
-        , isRequired = False
+        , attributes =
+            [ Name "first_name"
+            , Label "First name"
+            ]
         , drag = Drag.idle
         }
 
@@ -158,9 +176,16 @@ groupElementWith : { inline : Bool } -> List Element -> Element
 groupElementWith { inline } elements =
     ElementGroup
         { id = Id.fromInt 2
-        , name = Just "person"
-        , label = Just "Person"
-        , inline = inline
+        , attributes =
+            [ Name "person"
+            , Label "Person"
+            ]
+                ++ (if inline then
+                        [ Inline True ]
+
+                    else
+                        []
+                   )
         , elements = elements
         , drag = Drag.idle
         , isOpen = True
@@ -171,9 +196,10 @@ repeatableGroupElement : List Element -> Element
 repeatableGroupElement elements =
     RepeatableGroup
         { id = Id.fromInt 3
-        , name = Just "people"
-        , label = Just "People"
-        , inline = False
+        , attributes =
+            [ Name "people"
+            , Label "People"
+            ]
         , elements = elements
         , drag = Drag.idle
         , isOpen = True
